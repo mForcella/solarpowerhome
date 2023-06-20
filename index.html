@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, height=device-height,  initial-scale=1.0, user-scalable=no, user-scalable=0"/>
+	<meta name="robots" content="noindex">
+	<!-- <meta property="og:image" content="https://crabagain.com/assets/image/treasure-header-desaturated.jpg"> -->
+	<title>Solar Power Home</title>
+	<link rel="icon" type="image/png" href="/image/favicon.ico"/>
+
+	<!-- Bootstrap -->
+	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+	<!-- Font Awesome -->
+	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+	<!-- jQuery UI -->
+	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+	<!-- Google Fonts -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;800&family=Alegreya:ital,wght@0,400;1,400;1,600&family=Merriweather:wght@300;700&display=swap" rel="stylesheet">
+
+	<!-- Custom Styles -->
+	<!-- <link rel="stylesheet" type="text/css" href="<?php echo $keys['styles'] ?>"> -->
+	<style>
+		.header {
+			height: 150px;
+			padding: 25px;
+		}
+		.header img {
+			max-height: 100px;
+		}
+		.content.row {
+			padding-left: 5vw;
+			padding-right: 5vw;
+		}
+		.area-row {
+			padding-top: 10px;
+		}
+		.area-row input {
+			margin: 0 5px;
+		}
+		#map {
+		    height: 300px;
+		    margin: 10px 0;
+		}
+	</style>
+
+</head>
+
+<body>
+
+	<div class="header">
+		<img src="/image/logo.png">
+	</div>
+
+	<!-- user starting options : calculate array size from google maps or jump to configurator if array size is known or there is no address -->
+
+	<div class="content row">
+		<div class="col col-md-12">
+			<p>Enter your address below to calculate your solar array size.</p>
+			<input type="text" class="form-control" id="map_address">
+		</div>
+	</div>
+	<div class="content row">
+		<div class="col col-md-12">
+    		<div id="map" class="map"></div>
+		</div>
+		<div class="col col-md-12" id="area_inputs">
+			<label class="control-label">Total array area</label>
+			<input type="number" readonly id="total_area" value="0">
+			<button class="btn btn-primary" type="button" onclick="clearMap()">Clear Map</button>
+		</div>
+	</div>
+
+
+
+	<!-- google maps calculator -->
+
+		<!-- enter address, zoom to location -->
+
+		<!-- adjust zoom to focus on array area -->
+
+		<!-- draw a rectangle on the area -->
+
+		<!-- calculate size and move to configurator -->
+
+	<!-- the configurator -->
+
+		<!-- user selects the panel module type -->
+
+		<!-- user selects the inverter type -->
+
+		<!-- from area size, determine how many panels will be needed -->
+
+		<!-- user can scale back the number of panels if desired -->
+
+		<!-- user confirms panel number selection -->
+
+		<!-- output a detailed quote -->
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	<!-- <script async src="https://www.google.com/recaptcha/api.js?render=6Lc_NB8gAAAAAF4AG63WRUpkeci_CWPoX75cS8Yi"></script> -->
+	<script src="bootstrap/js/bootstrap.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/js/all.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+
+	<!-- <script src="<?php echo $keys['scripts'] ?>"></script> -->
+	<script type="text/javascript">
+
+		var map;
+		var shapeEnabled = false;
+		var overlays = [];
+		var iterator_id = 0;
+
+		function initMap() {
+
+		    map = new google.maps.Map(document.getElementById('map'), {
+		        center: {lat: 41.798057, lng: -93.973488},
+		        zoom: 3,
+		        mapTypeId: 'satellite',
+		        streetViewControl: false
+		    });
+
+			// initialize the google map and inputs
+	        let options = { componentRestrictions: {country: ['us', 'ca']} };
+	        let input = document.getElementById('map_address');
+	        let departure_autocomplete = new google.maps.places.Autocomplete(input, options);
+
+            // set select function for address input
+            google.maps.event.addListener(departure_autocomplete, 'place_changed', function() {
+                if (departure_autocomplete.getPlace().geometry == undefined) {
+                    return;
+                }
+                // zoom to location on map
+                map.setCenter(departure_autocomplete.getPlace().geometry.location);
+                map.setZoom(19);
+
+                // enable shape drawing
+                if (!shapeEnabled) {
+                	shapeEnabled = true;
+					let drawingManager = new google.maps.drawing.DrawingManager({
+						drawingMode: google.maps.drawing.OverlayType.POLYGON,
+						drawingControl: true,
+						drawingControlOptions: {
+							position: google.maps.ControlPosition.TOP_CENTER,
+							drawingModes: [
+								google.maps.drawing.OverlayType.POLYGON,
+							],
+						},
+					});
+					drawingManager.setMap(map);
+
+					// add event listener for shape complete
+					google.maps.event.addListener(drawingManager, 'overlaycomplete', function(event) {
+						if (event.type == 'polygon') {
+							let overlay = event.overlay;
+							overlays[iterator_id] = overlay;
+							let polygon_id = iterator_id;
+
+							// enable shape changing
+							overlay.setEditable(true);
+							google.maps.event.addListener(overlay.getPath(), 'set_at', function() {
+								let sqMeters = google.maps.geometry.spherical.computeArea(overlay.getPath());
+								updateArea(polygon_id, sqMeters);
+								setTotalArea();
+							});
+
+							// calculate size
+							let sqMeters = google.maps.geometry.spherical.computeArea(overlay.getPath());
+							setTotalArea();
+
+							// create inputs for polygon
+							let row = $('<div />', {
+								'class': "area-row",
+								'id': "row_"+iterator_id
+							}).appendTo($("#area_inputs"));
+							$('<label />', {
+								'class': "control-label",
+								'text': "Array area (square meters)"
+							}).appendTo(row);
+							$('<input />', {
+								'type': "number",
+								'value': sqMeters.toFixed(2),
+								'id': "area_"+iterator_id
+							}).appendTo(row);
+							let button = $('<button />', {
+								'class': "btn btn-primary",
+								'text': "Remove polygon",
+								'type': "button",
+								'id': iterator_id++
+							}).appendTo(row);
+							button.on("click", function() {
+								clearMap(this.id);
+							});
+						}
+					});
+                }
+            });
+		}
+
+		// update area value for an individual polygon
+		function updateArea(polygon_id, sqMeters) {
+			$("#area_"+polygon_id).val(sqMeters.toFixed(2));
+		}
+
+		// calculate total area from all polygon overlays
+		function setTotalArea() {
+			var area = 0;
+			for (var i in overlays) {
+				if (overlays[i] != null) {
+					let sqMeters = google.maps.geometry.spherical.computeArea(overlays[i].getPath());
+					area += sqMeters;
+				}
+			}
+			$("#total_area").val(area.toFixed(2));
+		}
+
+		// clear shapes from map
+		function clearMap(polygon_id) {
+			if (polygon_id == undefined) {
+				// clear the entire map
+				for (var i in overlays) {
+					if (overlays[i] != null) {
+						overlays[i].setMap(null);
+						$("#row_"+i).remove();
+					}
+				}
+				overlays = [];
+				iterator_id = 0;
+				$("#total_area").val(0);
+			} else {
+				overlays[polygon_id].setMap(null);
+				overlays[polygon_id] = null;
+				$("#row_"+polygon_id).remove();
+				setTotalArea();
+			}
+		}
+
+	</script>
+
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtocRbc2TsrDu6Oz6jAo3LcPGLPnXYDSw&callback=initMap&libraries=places,drawing" async defer></script>
+
+</body>
+</html>
