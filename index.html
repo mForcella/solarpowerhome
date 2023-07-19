@@ -13,13 +13,17 @@
 	<!-- Font Awesome -->
 	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
 	<!-- jQuery UI -->
-	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+	<!-- <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css"> -->
 	<!-- Google Fonts -->
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;800&family=Alegreya:ital,wght@0,400;1,400;1,600&family=Merriweather:wght@300;700&display=swap" rel="stylesheet">
 
 	<style>
+		html, body {
+		    max-width: 100%;
+		    overflow-x: hidden;
+		}
 		.header {
 			height: 150px;
 			padding: 25px;
@@ -50,6 +54,9 @@
 		#map_container {
 			margin-top: 30px;
 		}
+		.map-col {
+			text-align: center;
+		}
 		#map {
 		    height: 450px;
 		    margin: 10px auto;
@@ -73,8 +80,7 @@
 			display: none;
 		}
 		.shape-canvas {
-			position: absolute;
-			top: 10px;
+			top: -500px;
 			padding: 0;
 		}
 		#map_overlay .row {
@@ -90,6 +96,9 @@
 			width: 26px;
 			display: inline-block;
 			height: 100%;
+		}
+		#finish_btn {
+			float: right;
 		}
 	</style>
 
@@ -107,7 +116,7 @@
 			<input type="text" class="form-control" id="map_address">
 		</div>
 		<div class="col col-md-12" id="rotate_controls">
-			<p>Use the controls below to orient your roof parallel with the grid lines. Click Continue when done. </p>
+			<p>Use the controls below to orient your solar array area parallel with the grid lines. Click 'Confirm' when done. </p>
 			<button class="btn btn-primary btn-rotate" id="rotate_right"><i class="fa-solid fa-rotate-right"></i></button>
 			<button class="btn btn-primary btn-rotate" id="rotate_left"><i class="fa-solid fa-rotate-left"></i></button>
 			<div class="row btn-row">
@@ -115,71 +124,50 @@
 			</div>
 		</div>
 		<div class="col col-md-12" id="go_back">
-			<button class="btn btn-primary" onclick="changeHeading()">Adjust Map Heading</button>
+			<button class="btn btn-primary" onclick="changeHeading()">Adjust Map Location, Zoom, Heading</button>
 		</div>
 	</div>
 	<div class="content row" id="map_container">
-		<div class="col col-md-12">
+		<div class="col col-md-12 map-col">
     		<div id="map" class="map"></div>
     		<div id="map_overlay"></div>
     		<canvas id="shape_canvas" class="shape-canvas" height="450"></canvas>
 		</div>
-		<!-- TODO add option to switch to polyline drawing? -->
-		<div class="col col-md-12" id="area_inputs">
-			<div class="row">
-				<!-- <button class="btn btn-primary" type="button">Confirm Array Configuration</button> -->
-			</div>
+		<form class="col col-md-12" id="area_inputs">
+			<button class="btn btn-primary" type="button" id="finish_btn" onclick="finishConfig()" disabled>Confirm Array Configuration</button>
 			<label class="control-label">Total array area (square meters)</label>
 			<input type="number" readonly id="total_area" value="0">
 			<button class="btn btn-primary" type="button" onclick="clearMap()">Clear Map</button>
-		</div>
+			<button class="btn btn-primary" type="button" onclick="undo()">Undo</button>
+		</form>
 	</div>
 
 
+	<!-- TODO need option - 'skip and jump to configurator' -->
 
-	<!-- step 4 - confirm shapes -->
-
-	<!-- step 5 - go to configurator page -->
-
-	<!-- step 6 - choose your equipment -->
+	<!-- step 6 - choose your equipment (panel and inverter) -->
 
 	<!-- step 7 - click to lay panels in area (option to fill in all available space) -->
 
 	<!-- step 8 - confirm and get quote -->
 
 
-
-	<!-- need option - 'skip and jump to configurator' -->
-
-
-
-	<!-- the configurator -->
-
-		<!-- user selects the panel module type -->
-
-		<!-- user selects the inverter type -->
-
-		<!-- from area size, determine how many panels will be needed -->
-
-		<!-- user can scale back the number of panels if desired -->
-
-		<!-- user confirms panel number selection -->
-
-		<!-- output a detailed quote -->
-
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/js/all.min.js"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+	<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script> -->
 
 	<script type="text/javascript">
 
-		var map;
+		let map;
+		let maxZoomService;
 		var rotateRight, rotateLeft = false;
 
 		// shape drawing variables
+		var overlayView;
+		var projection;
 		var overlays = [];
-		var shapes = [];
+		var canvases = [];
 		var isDown = false;
 		var iterator_id = 0;
 		var canvas, ctx, startX, startY, offsetX, offsetY, scrollX, scrollY, height, width;
@@ -198,18 +186,14 @@
 
 		$("#rotate_right").on("mousedown", function() {
 			rotateRight = true;
-			setTimeout(function() {
-				rotate();
-			}, 50);
+			setTimeout(function() { rotate(); }, 50);
 		});
 		$("#rotate_right").on("mouseup", function() {
 			rotateRight = false;
 		});
 		$("#rotate_left").on("mousedown", function() {
 			rotateLeft = true;
-			setTimeout(function() {
-				rotate();
-			}, 50);
+			setTimeout(function() { rotate(); }, 50);
 		});
 		$("#rotate_left").on("mouseup", function() {
 			rotateLeft = false;
@@ -223,17 +207,15 @@
 				map.setHeading(map.getHeading() - 1);
 			}
 			if (rotateLeft || rotateRight) {
-				setTimeout(function() {
-					rotate();
-				}, 50);
+				setTimeout(function() { rotate(); }, 50);
 			}
 		}
 
 		function changeHeading() {
-			$("#go_back").hide(1000, function(){
+			$("#go_back").hide(500, function(){
 	        	$("#map_overlay").show();
-	        	$("#rotate_controls").show(1000);
-	        	$("#area_inputs").hide(1000);
+	        	$("#rotate_controls").show(500);
+	        	$("#area_inputs").hide(500);
 	        	$("#map").css("pointer-events","auto");
 	    		$("#shape_canvas").css("pointer-events","none");
 	    		// disable canvas drawing
@@ -243,44 +225,40 @@
 
 		function confirmHeading() {
 			// hide grid and rotation controls
-			$("#go_back").show(1000);
+			$("#go_back").show(500);
         	$("#map_overlay").hide();
         	$("#map").css("pointer-events","none");
-        	$("#rotate_controls").hide(1000, function() {
+        	$("#rotate_controls").hide(500, function() {
         		$(".shape-canvas").css("pointer-events","auto");
-	        	$("#area_inputs").show(1000);
-            	// clone a new canvas and enable drawing on it
-            	let new_canvas = $("#shape_canvas").clone();
-            	$(new_canvas).attr("id", iterator_id);
-	        	$(new_canvas).attr("width", $("#map").width());
-            	$("#map_overlay").after(new_canvas);
-	        	$(new_canvas).show();
-            	enableShapeDrawing(iterator_id);
+	        	$("#area_inputs").show(500);
+	        	if (!$("#canvas_"+iterator_id).is(":visible")) {
+	        		cloneCanvas();
+	        	}
         	});
 		}
 
+		// custom shape drawing API so that rectangles can be drawn on a rotated Google map
 		// https://stackoverflow.com/questions/65376480/let-users-draw-rectangles-with-mouse-in-canvas-with-javascript
 		function enableShapeDrawing() {
 
 			// calculate where the canvas is on the window
-			canvas = document.getElementById(iterator_id);
+			canvas = document.getElementById("canvas_"+iterator_id);
 
 			// get references to the canvas and context
 			ctx = canvas.getContext("2d");
 			ctx.strokeStyle = "black";
-			ctx.lineWidth = 3;
-			shapes[iterator_id] = ctx;
+			ctx.lineWidth = 2;
 
-			let $canvas = $("#"+iterator_id);
+			let $canvas = $("#canvas_"+iterator_id);
 			let canvasOffset = $canvas.offset();
 			offsetX = canvasOffset.left;
 			offsetY = canvasOffset.top;
 
 			// listen for mouse events
-			$("#"+iterator_id).mousedown(function (e) { handleMouseDown(e); });
-			$("#"+iterator_id).mousemove(function (e) { handleMouseMove(e); });
-			$("#"+iterator_id).mouseup(function (e) { handleMouseUp(e); });
-			$("#"+iterator_id).mouseout(function (e) { handleMouseOut(e); });
+			$("#canvas_"+iterator_id).mousedown(function (e) { handleMouseDown(e); });
+			$("#canvas_"+iterator_id).mousemove(function (e) { handleMouseMove(e); });
+			$("#canvas_"+iterator_id).mouseup(function (e) { handleMouseUp(e); });
+			$("#canvas_"+iterator_id).mouseout(function (e) { handleMouseOut(e); });
 
 		}
 
@@ -296,8 +274,12 @@
 			}).appendTo(row);
 			$('<input />', {
 				'type': "text",
-				'value': s1.toFixed(2)+" x "+s2.toFixed(2),
-				'id': "area_"+iterator_id
+				'value': s1.toFixed(2)+" x "+s2.toFixed(2)
+			}).appendTo(row);
+			$('<input />', {
+				'type': "hidden",
+				'name': "polygons[]",
+				'value': s1.toFixed(2)+","+s2.toFixed(2)
 			}).appendTo(row);
 			let button = $('<button />', {
 				'class': "btn btn-primary btn-remove",
@@ -310,17 +292,6 @@
 			});
 		}
 
-		// convert DOM x-y coordinates to lat-lng
-		// https://stackoverflow.com/questions/25219346/how-to-convert-from-x-y-screen-coordinates-to-latlng-google-maps
-		function point2LatLng(pointX, pointY) {
-			// TODO adjust topRight and bottomLeft based on headding to find correct location on rotated map
-			var topRight = map.getProjection().fromLatLngToPoint(map.getBounds().getNorthEast());
-			var bottomLeft = map.getProjection().fromLatLngToPoint(map.getBounds().getSouthWest());
-			var scale = Math.pow(2, map.getZoom());
-			var worldPoint = new google.maps.Point(pointX / scale + bottomLeft.x, pointY / scale + topRight.y);
-			return map.getProjection().fromPointToLatLng(worldPoint);
-		}
-
 		// begin shape drawing
 		function handleMouseDown(e) {
 		    e.preventDefault();
@@ -328,11 +299,18 @@
 
 		    // save the starting x/y of the rectangle
 		    scrollY  = window.pageYOffset || document.documentElement.scrollTop;
-		    startX = parseInt(e.clientX - offsetX);
+		    scrollX  = 0; // horiznotal scroll disabled - value is always zero
+		    startX = parseInt(e.clientX - offsetX + scrollX);
 		    startY = parseInt(e.clientY - offsetY + scrollY);
 
 		    // set a flag indicating the drag has begun
 		    isDown = true;
+
+		    // initialize overlayView and map projection
+			overlayView = new google.maps.OverlayView();
+			overlayView.draw = function() {};
+			overlayView.draw();
+			overlayView.setMap(map);
 		}
 
 		// end shape drawing
@@ -343,36 +321,40 @@
 		    // the drag is over, clear the dragging flag
 		    isDown = false;
 
+			projection = overlayView.getProjection();
+			if (projection == undefined) {
+				return;
+			}
+
 		    // calculate the size of the rectangle on the canvas
 		    let points = [];
-		    points.push(point2LatLng(startX, startY));
-		    points.push(point2LatLng(startX+width, startY));
-		    points.push(point2LatLng(startX+width, startY+height));
-		    points.push(point2LatLng(startX, startY+height));
+		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY)));
+		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX+width, startY)));
+		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX+width, startY+height)));
+		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY+height)));
 		    width = height = 0;
-
-		    // TODO overlay not in the correct position if the map has been rotated
-		    // var overlay = new google.maps.Polygon({
-			// 	paths: points,
-			// 	strokeColor: '#FF0000',
-			// 	strokeOpacity: 0.8,
-			// 	strokeWeight: 2,
-			// 	fillColor: '#FF0000',
-			// 	fillOpacity: 0.35
-			// });
-			// overlay.setMap(map);
-			// overlays.push(overlay);
-			// let sqMeters = google.maps.geometry.spherical.computeArea(overlay.getPath());
 
 		    for (var i in points) {
 		    	if (isNaN(points[i].lat()) || isNaN(points[i].lng())) {
 		    		return;
 		    	}
 		    }
-		    var overlay = new google.maps.Polygon({ paths: points });
+
+		    var overlay = new google.maps.Polygon({
+				paths: points,
+				strokeColor: 'black',
+				strokeOpacity: 0.8,
+				strokeWeight: 2,
+				fillColor: '#FF0000',
+				fillOpacity: 0.35
+			});
+
 			let sqMeters = google.maps.geometry.spherical.computeArea(overlay.getPath());
 			if (sqMeters < 1) { return; }
+
 			overlays[iterator_id] = overlay;
+			overlay.setMap(map);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 			let s1 = google.maps.geometry.spherical.computeDistanceBetween(points[0], points[1]);
 			let s2 = google.maps.geometry.spherical.computeDistanceBetween(points[0], points[3]);
@@ -380,23 +362,17 @@
 			setTotalArea();
 
 			// clone and create new canvas object
-        	let new_canvas = $("#shape_canvas").clone();
-        	$(new_canvas).attr("id", iterator_id);
-        	$(new_canvas).attr("width", $("#map").width());
-        	$("#map_overlay").after(new_canvas);
-        	$(new_canvas).show();
-        	enableShapeDrawing(iterator_id);
+			cloneCanvas();
 		}
 
 		// end shape drawing
 		function handleMouseOut(e) {
 		    e.preventDefault();
 		    e.stopPropagation();
-
-		    // the drag is over, clear the dragging flag
 		    isDown = false;
-
-		    handleMouseUp(e);
+		    if (projection != undefined) {
+		    	handleMouseUp(e);
+		    }
 		}
 
 		function handleMouseMove(e) {
@@ -407,7 +383,7 @@
 		    if (!isDown) { return; }
 
 		    // get the current mouse position
-		    mouseX = parseInt(e.clientX - offsetX);
+		    mouseX = parseInt(e.clientX - offsetX + scrollX);
 		    mouseY = parseInt(e.clientY - offsetY);
 
 		    // clear the canvas
@@ -420,6 +396,88 @@
 		    // draw a new rect from the start position 
 		    ctx.strokeRect(startX, startY, width, height);
 
+		}
+
+		// calculate total area from all polygon overlays
+		function setTotalArea() {
+			var area = 0;
+			for (var i in overlays) {
+				if (overlays[i] != null) {
+					let sqMeters = google.maps.geometry.spherical.computeArea(overlays[i].getPath());
+					area += sqMeters;
+				}
+			}
+			$("#total_area").val(area.toFixed(2));
+			$("#finish_btn").attr("disabled", false);
+		}
+
+		// remove last added polygon
+		function undo() {
+			if (iterator_id > 0) {
+				for (var i = overlays.length - 1; i >=0; i--) {
+					if (overlays[i] != null) {
+						clearMap(i);
+						break;
+					}
+				}
+			}
+		}
+
+		// clear shapes from map
+		function clearMap(polygon_id) {
+			// clear all shapes
+			if (polygon_id == undefined) {
+				for (var i in overlays) {
+					if (overlays[i] != null) {
+						overlays[i].setMap(null);
+						$("#row_"+i).remove();
+						$("#"+i).remove();
+					}
+				}
+				overlays = [];
+				$("#canvas_"+iterator_id).remove();
+				iterator_id = 0;
+				$("#total_area").val(0);
+				cloneCanvas();
+			} else {
+				// clear a single shape
+				overlays[polygon_id].setMap(null);
+				overlays[polygon_id] = null;
+				$("#row_"+polygon_id).remove();
+				$("#"+polygon_id).remove();
+				setTotalArea();
+			}
+			if ($("#total_area").val() == 0) {
+				$("#finish_btn").attr("disabled", true);
+			}
+		}
+
+		// create a new shape drawing canvas
+		function cloneCanvas() {
+			// delete the old canvas from the DOM
+			if (iterator_id > 0) {
+				$("#canvas_"+(parseInt(iterator_id)-1)).remove();
+				let oldCanvas = canvases.pop();
+				oldCanvas.remove();
+			}
+        	let new_canvas = $("#shape_canvas").clone();
+        	$(new_canvas).attr("id", "canvas_"+iterator_id);
+        	$(new_canvas).attr("width", $("#map").width());
+        	$("#map_overlay").after(new_canvas);
+        	canvases.push(new_canvas);
+        	$(new_canvas).show();
+        	enableShapeDrawing(iterator_id);
+		}
+
+		// move to configurator
+		function finishConfig() {
+			let conf = confirm("Continue with the current array layout?");
+			if (conf) {
+				// TODO submit the form, area_inputs
+				let data = $("#area_inputs").serialize();
+				let array = $("#area_inputs").serializeArray();
+				console.log(array);
+			}
 		}
 
 		function initMap() {
@@ -436,78 +494,36 @@
 	        let options = { componentRestrictions: {country: ['us', 'ca']} };
 	        let input = document.getElementById('map_address');
 	        let departure_autocomplete = new google.maps.places.Autocomplete(input, options);
-
-	        // TODO try to disable tilt?
-	        // google.maps.event.addListener(map, 'tilt_changed', function() {
-			//     if (map.getTilt() != 0) {
-			//         map.setTilt(0);
-			//     }
-			// });
+	        maxZoomService = new google.maps.MaxZoomService();
 
             // set select function for address input
             google.maps.event.addListener(departure_autocomplete, 'place_changed', function() {
+
             	// on place changed, show map grid overlay, prompt to rotate map
-            	$("#map_overlay").show();
-            	$("#rotate_controls").show(1000);
+            	changeHeading();
 
                 if (departure_autocomplete.getPlace().geometry == undefined) {
                     return;
                 }
                 // zoom to location on map
                 map.setCenter(departure_autocomplete.getPlace().geometry.location);
-                // TODO can't zoom past level 19 on first place change
+
             	map.setZoom(20);
+            	setMaxZoom(departure_autocomplete);
             });
 		}
 
-		// calculate total area from all polygon overlays
-		function setTotalArea() {
-			var area = 0;
-			for (var i in overlays) {
-				if (overlays[i] != null) {
-					let sqMeters = google.maps.geometry.spherical.computeArea(overlays[i].getPath());
-					area += sqMeters;
+		// make sure map is set to 20, or the maximum allowable zoom for the current map location
+		function setMaxZoom(departure_autocomplete) {
+			let latLng = departure_autocomplete.getPlace().geometry.location;
+			maxZoomService.getMaxZoomAtLatLng(latLng, (result) => {
+				// if map zoom is less than max allowable, trigger place_changed event again
+				if (result.status == "OK" && map.getZoom() < result.zoom && map.getZoom() < 20) {
+            		setTimeout(() => {
+            			google.maps.event.trigger(departure_autocomplete, 'place_changed');
+            		}, 100);
 				}
-			}
-			$("#total_area").val(area.toFixed(2));
-		}
-
-		// clear shapes from map
-		function clearMap(polygon_id) {
-			// clear all shapes
-			if (polygon_id == undefined) {
-				for (var i in shapes) {
-					if (shapes[i] != null) {
-						shapes[i].clearRect(0, 0, canvas.width, canvas.height);
-					}
-					$("#row_"+i).remove();
-					$("#"+i).remove();
-				}
-				overlays = [];
-				shapes = [];
-				iterator_id = 0;
-				$("#total_area").val(0);
-				cloneCanvas();
-
-			} else {
-				// clear a single shape
-				shapes[polygon_id].clearRect(0, 0, canvas.width, canvas.height);
-				shapes[polygon_id] = null;
-				overlays[polygon_id] = null;
-				$("#row_"+polygon_id).remove();
-				$("#"+polygon_id).remove();
-				setTotalArea();
-			}
-		}
-
-		// create a new shape drawing canvas
-		function cloneCanvas() {
-        	let new_canvas = $("#shape_canvas").clone();
-        	$(new_canvas).attr("id", iterator_id);
-        	$(new_canvas).attr("width", $("#map").width());
-        	$("#map_overlay").after(new_canvas);
-        	$(new_canvas).show();
-        	enableShapeDrawing(iterator_id);
+			});
 		}
 
 	</script>
