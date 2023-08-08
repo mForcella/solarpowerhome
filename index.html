@@ -100,6 +100,9 @@
 		#finish_btn {
 			float: right;
 		}
+		.polygon {
+			display: none;
+		}
 	</style>
 
 </head>
@@ -133,7 +136,8 @@
     		<div id="map_overlay"></div>
     		<canvas id="shape_canvas" class="shape-canvas" height="450"></canvas>
 		</div>
-		<form class="col col-md-12" id="area_inputs">
+		<form class="col col-md-12" id="area_inputs" method="post" action="configurator.php">
+		<!-- <form class="col col-md-12" id="area_inputs" method="post" action="/configurator/"> -->
 			<button class="btn btn-primary" type="button" id="finish_btn" onclick="finishConfig()" disabled>Confirm Array Configuration</button>
 			<label class="control-label">Total array area (square meters)</label>
 			<input type="number" readonly id="total_area" value="0">
@@ -142,15 +146,7 @@
 		</form>
 	</div>
 
-
 	<!-- TODO need option - 'skip and jump to configurator' -->
-
-	<!-- step 6 - choose your equipment (panel and inverter) -->
-
-	<!-- step 7 - click to lay panels in area (option to fill in all available space) -->
-
-	<!-- step 8 - confirm and get quote -->
-
 
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
@@ -473,22 +469,30 @@
 		function finishConfig() {
 			let conf = confirm("Continue with the current array layout?");
 			if (conf) {
-				// TODO submit the form, area_inputs
-				let data = $("#area_inputs").serialize();
-				let array = $("#area_inputs").serializeArray();
-				console.log(array);
+				$("#area_inputs").submit();
 			}
 		}
 
 		function initMap() {
+
+			// check for WebGL support
+			const canvas = document.createElement("canvas");
+			canvas.getContext("webgl2") ? console.log("WebGL 2 is supported") : console.log("WebGL 2 is NOT supported");
 
 		    map = new google.maps.Map(document.getElementById('map'), {
 		        center: {lat: 41.798057, lng: -93.973488},
 		        zoom: 3,
 		        mapTypeId: 'satellite',
 		        streetViewControl: false,
-		        mapId: "90f87356969d889c",
+		        // mapId: "90f87356969d889c",
+		        mapId: "becf7acd50b92835",
 		    });
+
+		    map.addListener("renderingtype_changed", () => {
+		    	if (map.getRenderingType() != "VECTOR") {
+		    		alert("Vector map failed to initialize. Some map functions may not work as expected.");
+		    	}
+			});
 
 			// initialize the google map and inputs
 	        let options = { componentRestrictions: {country: ['us', 'ca']} };
@@ -518,17 +522,21 @@
 			let latLng = departure_autocomplete.getPlace().geometry.location;
 			maxZoomService.getMaxZoomAtLatLng(latLng, (result) => {
 				// if map zoom is less than max allowable, trigger place_changed event again
-				if (result.status == "OK" && map.getZoom() < result.zoom && map.getZoom() < 20) {
-            		setTimeout(() => {
-            			google.maps.event.trigger(departure_autocomplete, 'place_changed');
-            		}, 100);
+				if (result.status == "OK") {
+					let maxZoom = result.zoom < 20 ? result.zoom : 20;
+					if (map.getZoom() < maxZoom) {
+	            		setTimeout(() => {
+	            			google.maps.event.trigger(departure_autocomplete, 'place_changed');
+	            		}, 100);
+	            	}
 				}
 			});
 		}
 
 	</script>
 
-    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtocRbc2TsrDu6Oz6jAo3LcPGLPnXYDSw&callback=initMap&v=beta&libraries=places,drawing,geometry" async defer></script>
+    <!-- <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtocRbc2TsrDu6Oz6jAo3LcPGLPnXYDSw&callback=initMap&v=beta&libraries=places,drawing,geometry" async defer></script> -->
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBffEwkEC7pbKMa57WpjvdykDW9GZKGezQ&callback=initMap&v=beta&libraries=places,drawing,geometry" async defer></script>
 
 </body>
 </html>
