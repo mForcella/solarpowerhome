@@ -4,7 +4,6 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, height=device-height,  initial-scale=1.0, user-scalable=no, user-scalable=0"/>
 	<meta name="robots" content="noindex">
-	<!-- <meta property="og:image" content="https://crabagain.com/assets/image/treasure-header-desaturated.jpg"> -->
 	<title>Solar Power Home</title>
 	<link rel="icon" type="image/png" href="/image/favicon.ico"/>
 
@@ -12,8 +11,6 @@
 	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
 	<!-- Font Awesome -->
 	<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
-	<!-- jQuery UI -->
-	<!-- <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css"> -->
 	<!-- Google Fonts -->
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,6 +45,9 @@
 		.btn-rotate {
 			width: 100px;
 		}
+		.btn-confirm {
+			width: 204px;
+		}
 		.btn-remove {
 			width: auto;
 		}
@@ -66,6 +66,7 @@
 			margin-top: 30px;
 			display: none;
 			text-align: center;
+			z-index: 999;
 		}
 		#area_inputs {
 			display: none;
@@ -103,6 +104,18 @@
 		.polygon {
 			display: none;
 		}
+		#compass {
+			width: 100px;
+			padding: 0;
+			margin-left: 50px;
+			text-align: left;
+		}
+		#compass img {
+			height: 100px;
+		}
+		#rotate_buttons {
+			text-align: right;
+		}
 	</style>
 
 </head>
@@ -120,10 +133,17 @@
 		</div>
 		<div class="col col-md-12" id="rotate_controls">
 			<p>Use the controls below to orient your solar array area parallel with the grid lines. Click 'Confirm' when done. </p>
-			<button class="btn btn-primary btn-rotate" id="rotate_right"><i class="fa-solid fa-rotate-right"></i></button>
-			<button class="btn btn-primary btn-rotate" id="rotate_left"><i class="fa-solid fa-rotate-left"></i></button>
-			<div class="row btn-row">
-				<button class="btn btn-primary" onclick="confirmHeading()">Confirm</button>
+			<div class="col col-md-6" id="rotate_buttons">
+				<div class="row btn-row">
+					<button class="btn btn-primary btn-rotate" id="rotate_right"><i class="fa-solid fa-rotate-right"></i></button>
+					<button class="btn btn-primary btn-rotate" id="rotate_left"><i class="fa-solid fa-rotate-left"></i></button>
+				</div>
+				<div class="row btn-row">
+					<button class="btn btn-primary btn-confirm" onclick="confirmHeading()">Confirm Map Heading</button>
+				</div>
+			</div>
+			<div class="col col-md-6" id="compass">
+				<img src="/image/compass.svg">
 			</div>
 		</div>
 		<div class="col col-md-12" id="go_back">
@@ -151,7 +171,6 @@
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/js/all.min.js"></script>
-	<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script> -->
 
 	<script type="text/javascript">
 
@@ -196,21 +215,23 @@
 		});
 
 		function rotate() {
+			if (!rotateLeft && !rotateRight) {
+				return;
+			}
 			if (rotateLeft) {
 				map.setHeading(map.getHeading() + 1);
 			}
 			if (rotateRight) {
 				map.setHeading(map.getHeading() - 1);
 			}
-			if (rotateLeft || rotateRight) {
-				setTimeout(function() { rotate(); }, 50);
-			}
+			setTimeout(function() { rotate(); }, 50);
 		}
 
 		function changeHeading() {
 			$("#go_back").hide(500, function(){
 	        	$("#map_overlay").show();
 	        	$("#rotate_controls").show(500);
+	        	$("#compass").show(500);
 	        	$("#area_inputs").hide(500);
 	        	$("#map").css("pointer-events","auto");
 	    		$("#shape_canvas").css("pointer-events","none");
@@ -225,6 +246,7 @@
         	$("#map_overlay").hide();
         	$("#map").css("pointer-events","none");
         	$("#rotate_controls").hide(500, function() {
+        		$("#compass").hide(500);
         		$(".shape-canvas").css("pointer-events","auto");
 	        	$("#area_inputs").show(500);
 	        	if (!$("#canvas_"+iterator_id).is(":visible")) {
@@ -276,6 +298,11 @@
 				'type': "hidden",
 				'name': "polygons[]",
 				'value': s1.toFixed(2)+","+s2.toFixed(2)
+			}).appendTo(row);
+			$('<input />', {
+				'type': "hidden",
+				'name': "headings[]",
+				'value': map.getHeading()
 			}).appendTo(row);
 			let button = $('<button />', {
 				'class': "btn btn-primary btn-remove",
@@ -477,21 +504,26 @@
 
 			// check for WebGL support
 			const canvas = document.createElement("canvas");
-			canvas.getContext("webgl2") ? console.log("WebGL 2 is supported") : console.log("WebGL 2 is NOT supported");
+			canvas.getContext("webgl2") ? 
+				console.log("WebGL2 supported") : alert("WebGL 2 is not supported. Some map functions may not work as expected.");
 
 		    map = new google.maps.Map(document.getElementById('map'), {
 		        center: {lat: 41.798057, lng: -93.973488},
 		        zoom: 3,
 		        mapTypeId: 'satellite',
 		        streetViewControl: false,
-		        // mapId: "90f87356969d889c",
 		        mapId: "becf7acd50b92835",
 		    });
 
+		    // check for vector map initialization
 		    map.addListener("renderingtype_changed", () => {
-		    	if (map.getRenderingType() != "VECTOR") {
-		    		alert("Vector map failed to initialize. Some map functions may not work as expected.");
-		    	}
+		    	map.getRenderingType() == "VECTOR" ? 
+		    		console.log("Vector map successfully initialized") : alert("Vector map failed to initialize. Some map functions may not work as expected.");
+			});
+
+			// rotate compass image
+			map.addListener("heading_changed", function() {
+				rotateCompass(360 - map.getHeading());
 			});
 
 			// initialize the google map and inputs
@@ -517,6 +549,11 @@
             });
 		}
 
+		function rotateCompass(degree) {
+            $("#compass").css({ WebkitTransform: 'rotate(' + degree + 'deg)'});
+            $("#compass").css({ '-moz-transform': 'rotate(' + degree + 'deg)'});
+        }
+
 		// make sure map is set to 20, or the maximum allowable zoom for the current map location
 		function setMaxZoom(departure_autocomplete) {
 			let latLng = departure_autocomplete.getPlace().geometry.location;
@@ -535,7 +572,6 @@
 
 	</script>
 
-    <!-- <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtocRbc2TsrDu6Oz6jAo3LcPGLPnXYDSw&callback=initMap&v=beta&libraries=places,drawing,geometry" async defer></script> -->
     <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBffEwkEC7pbKMa57WpjvdykDW9GZKGezQ&callback=initMap&v=beta&libraries=places,drawing,geometry" async defer></script>
 
 </body>
