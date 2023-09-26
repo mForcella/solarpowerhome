@@ -168,6 +168,8 @@
 
 	</div>
 
+	<!-- TODO add manual controls if dimensions are known -->
+
 	<!-- TODO button to confirm and get quote -->
 
 
@@ -237,21 +239,24 @@
 				let pixels_per_cm = (canvas_width / (area_width * 100)).toFixed(3);
 				// let panel_width_pixels = (panel_dimensions[1] * pixels_per_cm).toFixed(3);
 
+				let panels_x = Math.floor((canvas_width)/(panel_dimensions[1]*pixels_per_cm));
+				let panels_y = Math.floor((canvas_height)/(panel_dimensions[0]*pixels_per_cm));
+
 				var startX = 0;
 				var startY = 0;
-				var panel_count = 0;
-				while (startY + panel_dimensions[0] < canvas_height) {
-			    	panel_count++;
+				var panelsLaid = 0;
+				while (panelsLaid < panels_x * panels_y) {
+			    	panelsLaid++;
 			    	startX = startX + panel_dimensions[1] * pixels_per_cm;
-			    	if (startX + panel_dimensions[1] > canvas_width) {
+		    		if (panelsLaid % panels_x == 0) {
 			    		startX = 0;
 			    		startY = startY + panel_dimensions[0] * pixels_per_cm;
 			    	}
 				}
 			    // set slider max value from panel count
-			    $("#s_"+i).attr("max", panel_count);
-			    $("#s_"+i).val(panel_count);
-			    $("#pcount_"+i).val(panel_count);
+			    $("#s_"+i).attr("max", panelsLaid);
+			    $("#s_"+i).val(panelsLaid);
+			    $("#pcount_"+i).val(panelsLaid);
 
 				// set panels onto canvas
 			    drawPanels(canvas, area_width, panel_dimensions, $("#s_"+i).val());
@@ -274,18 +279,14 @@
 			let pixels_per_cm = (canvas_width / (areaWidth * 100)).toFixed(3);
 			// let panel_width_pixels = (panelDimensions[1] * pixels_per_cm).toFixed(3);
 
-			// TODO not fitting panels correctly...
 			let panels_x = Math.floor((canvas_width)/(panelDimensions[1]*pixels_per_cm));
 			let panels_y = Math.floor((canvas_height)/(panelDimensions[0]*pixels_per_cm));
-			// console.log(panels_x);
-			// console.log(panels_y);
 
 			// set shapes onto canvas
 			var startX = 0;
 			var startY = 0;
 			var panelsLaid = 0;
-			while (startY + panelDimensions[0] < canvas_height) {
-			// while (panelsLaid < panels_x * panels_y) {
+			while (panelsLaid < panels_x * panels_y) {
 		    	panelsLaid++;
 		    	if (panelsLaid > panelSelected) {
 		    		ctx.beginPath();
@@ -295,12 +296,10 @@
 		    	ctx.fill();
 		    	ctx.stroke();
 		    	startX = startX + panelDimensions[1] * pixels_per_cm;
-		    	if (startX + panelDimensions[1] > canvas_width) {
-		    	// if (panelsLaid >= panels_x) {
+		    	if (panelsLaid % panels_x == 0) {
 		    		startX = 0;
 		    		startY = startY + panelDimensions[0] * pixels_per_cm;
 		    	}
-		    	// console.log(startX+","+startY);
 			}
 		}
 
@@ -318,12 +317,6 @@
 
 				let new_canvas = cloneCanvas(length, width);
 	        	$(new_canvas).attr("id", "canvas_"+polygon_count);
-
-				// change heading value if length and width are swapped
-				// if (s1 < s2) {
-				// 	$("#h_"+polygon_count).val( parseFloat($("#h_"+polygon_count).val()) + 90);
-				// }
-				// let heading = 360 - $("#h_"+polygon_count).val();
 
 				// append array info
 				let row = $('<div />').appendTo($("#canvases"));
@@ -348,7 +341,8 @@
 					'class': "form-control",
 					'type': "number",
 					'min': 0,
-					'value': length
+					'value': length,
+					'readOnly': true
 				}).appendTo($(col));
 
 				row = $('<div />').appendTo($(col));
@@ -363,7 +357,8 @@
 					'class': "form-control",
 					'type': "number",
 					'min': 0,
-					'value': width
+					'value': width,
+					'readOnly': true
 				}).appendTo($(row));
 
 				// COLUMN 2
@@ -425,7 +420,7 @@
 					'readOnly': true
 				}).appendTo($(row));
 
-				// add compass icon to show heading
+				// // add compass icon to show heading
 				// let compass = $('<img />', {
 				// 	'class': "compass",
 				// 	'src': '/image/compass.svg'
@@ -489,11 +484,11 @@
 			$("#pcount_"+id).val(val);
 		}
 
-		// set the compass icon rotation based on a heading
-		function rotateCompass(e, degree) {
-            $(e).css({ WebkitTransform: 'rotate(' + degree + 'deg)'});
-            $(e).css({ '-moz-transform': 'rotate(' + degree + 'deg)'});
-        }
+		// // set the compass icon rotation based on a heading
+		// function rotateCompass(e, degree) {
+        //     $(e).css({ WebkitTransform: 'rotate(' + degree + 'deg)'});
+        //     $(e).css({ '-moz-transform': 'rotate(' + degree + 'deg)'});
+        // }
 
  		// calculate a length taking pitch into account
 		function lengthWithPitch(length, pitch) {
@@ -505,9 +500,7 @@
 		function getMaxLength() {
 			let maxLength = 0;
 			for (var i in adjustedPolygons) {
-				let s1 = parseFloat(adjustedPolygons[i][0]);
-				let s2 = parseFloat(adjustedPolygons[i][1]);
-				let length = s1 >= s2 ? s1 : s2;
+				let length = adjustedPolygons[i][0];
 				maxLength = length > maxLength ? length : maxLength;
 			}
 			return maxLength;

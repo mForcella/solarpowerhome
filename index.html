@@ -29,8 +29,8 @@
 			max-height: 100px;
 		}
 		.content.row {
-			padding-left: 5vw;
-			padding-right: 5vw;
+			padding-left: 15vw;
+			padding-right: 15vw;
 		}
 		.area-row, #area_inputs {
 			padding-top: 10px;
@@ -52,7 +52,8 @@
 			width: auto;
 		}
 		#map_container {
-			margin-top: 30px;
+			margin-top: 15px;
+			margin-bottom: 30px;
 		}
 		.map-col {
 			text-align: center;
@@ -116,6 +117,35 @@
 		#rotate_buttons {
 			text-align: right;
 		}
+		#solar_stats {
+			margin-top: 30px;
+			display: none;
+		}
+		.note {
+			font-size: 0.7em;
+			text-align: center;
+/*			padding-top: 15px;*/
+		}
+		.info-box {
+			display: none;
+			background-color: gray;
+			color: white;
+			position: absolute;
+			padding: 10px;
+			font-size: 0.8em;
+			border-radius: 5px;
+			z-index: 999;
+		}
+		.chart {
+			height: 200px;
+/*			display: none;*/
+		}
+		.anychart-credits {
+			display: none;
+		}
+		.center {
+			text-align: center;
+		}
 	</style>
 
 </head>
@@ -132,7 +162,7 @@
 			<input type="text" class="form-control" id="map_address">
 		</div>
 		<div class="col col-md-12" id="rotate_controls">
-			<p>Use the controls below to orient your solar array area parallel with the grid lines. Click 'Confirm' when done. </p>
+			<p>Use the controls below to orient your solar array area (e.g. roof lines) parallel with the grid lines. Click 'Confirm' when done. </p>
 			<div class="col col-md-6" id="rotate_buttons">
 				<div class="row btn-row">
 					<button class="btn btn-primary btn-rotate" id="rotate_right"><i class="fa-solid fa-rotate-right"></i></button>
@@ -149,6 +179,45 @@
 		<div class="col col-md-12" id="go_back">
 			<button class="btn btn-primary" onclick="changeHeading()">Adjust Map Location, Zoom, Heading</button>
 		</div>
+		<div class="col col-md-12" id="solar_stats">
+			<div class="col col-md-4">
+				<label class="control-label">Total Roof Area (m<sup>2</sup>)</label>
+				<p class="form-control" id="roof_area"></p>
+			</div>
+			<div class="col col-md-4">
+					<label class="control-label">Roof Segment Area (m<sup>2</sup>)</label>
+					<p class="form-control" id="segment_area"></p>
+			</div>
+			<div class="col col-md-4">
+					<label class="control-label">Roof Segment Pitch Degrees</label>
+					<p class="form-control" id="segment_pitch"></p>
+			</div>
+			<div class="col col-md-6 center">
+				<label class="control-label info" id="max_sun_info">Total Roof Sunniness Per Year <i class="fa-solid fa-circle-info"></i></label>
+				<span class="info-box" id="max_sun_info_box">
+					Sunshine hours are a measure of the total amount of insolation (energy) received per year. 1 sunshine hour = 1 kWh per kW (where kW refers to kW of capacity under Standard Testing Conditions).<br><br>
+					The Solar API defines "sunniness" as the level of sunlight received by a particular section of a roof relative to the rest of the roof, annually on average. Some parts of a roof may be darker than others, due to shade from nearby buildings or tree cover, while other parts of a roof may be fully exposed to the sky at all times and therefore receive more sunlight.<br><br>
+					Because the sunniness will vary from one part of the roof to another, the sunniness value is represented not by a single number but by a range, which will vary from the least sunny 1% of a roof area to the most sunny 1% of a roof area.</span>
+				<div class="chart" id="total_roof_chart"></div>
+			</div>
+			<div class="col col-md-6 center">
+				<label class="control-label info" id="sunniness_info">Roof Segment Sunniness <i class="fa-solid fa-circle-info"></i></label>
+				<span class="info-box" id="sunniness_info_box">
+					Sunshine hours are a measure of the total amount of insolation (energy) received per year. 1 sunshine hour = 1 kWh per kW (where kW refers to kW of capacity under Standard Testing Conditions).<br><br>
+					The Solar API defines "sunniness" as the level of sunlight received by a particular section of a roof relative to the rest of the roof, annually on average. Some parts of a roof may be darker than others, due to shade from nearby buildings or tree cover, while other parts of a roof may be fully exposed to the sky at all times and therefore receive more sunlight.<br><br>
+					Because the sunniness will vary from one part of the roof to another, the sunniness value is represented not by a single number but by a range, which will vary from the least sunny 1% of a roof area to the most sunny 1% of a roof area.</span>
+				<div class="chart" id="segment_chart"></div>
+			</div>
+			<div class="col col-md-12">
+				<p class="note">*Building and solar data provided by Google Maps Solar API</p>
+			</div>
+			<!-- TODO need a way to specify which roof segments to select for panels -->
+			<!-- show numbered checklist of segments w/ stats: area, max sunniness, avg sunniness -->
+
+			<!-- TODO need to set roof segment data to area inputs - size, pitch, heading, etc -->
+
+			<!-- TODO need to show 'jump to configurator' page -->
+		</div>
 	</div>
 	<div class="content row" id="map_container">
 		<div class="col col-md-12 map-col">
@@ -157,7 +226,6 @@
     		<canvas id="shape_canvas" class="shape-canvas" height="450"></canvas>
 		</div>
 		<form class="col col-md-12" id="area_inputs" method="post" action="configurator.php">
-		<!-- <form class="col col-md-12" id="area_inputs" method="post" action="/configurator/"> -->
 			<button class="btn btn-primary" type="button" id="finish_btn" onclick="finishConfig()" disabled>Confirm Array Configuration</button>
 			<label class="control-label">Total array area (square meters)</label>
 			<input type="number" readonly id="total_area" value="0">
@@ -170,13 +238,18 @@
 
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
+	<!-- Font Awesome Icons - https://fontawesome.com/icons -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/js/all.min.js"></script>
+	<!-- AnyChart documentation - https://api.anychart.com/ -->
+	<script src="https://cdn.anychart.com/releases/8.0.0/js/anychart-base.min.js"></script>
 
 	<script type="text/javascript">
 
 		let map;
 		let maxZoomService;
 		var rotateRight, rotateLeft = false;
+		var roofSegments;
+		let roofMarkers;
 
 		// shape drawing variables
 		var overlayView;
@@ -213,6 +286,48 @@
 		$("#rotate_left").on("mouseup", function() {
 			rotateLeft = false;
 		});
+
+		$(".info").hover(function() {
+			$("#"+this.id+"_box").css("display", "block");
+		}, function() {
+			$("#"+this.id+"_box").hide();
+		});
+
+        function loadChartData(solarData, chartID) {
+        	// console.log(solarData);
+
+        	$("#"+chartID).html("");
+
+        	let rowData = [];
+        	for (var i in solarData) {
+        		let row = [];
+        		row.push(i*10);
+        		row.push(solarData[i]);
+        		rowData.push(row);
+        	}
+
+			let data = {
+	            header: ["%", "kWh/kW"],
+	            rows: rowData
+	        };
+
+	        var chart = anychart.column();
+	        chart.xAxis().title("%");
+	        chart.yAxis().title("kWh/kW");
+        	chart.yScale().softMaximum(2000);
+	        chart.container(chartID);
+	        chart.tooltip().titleFormat("");
+	        chart.tooltip().separator(false);
+	        chart.tooltip().format("{%value} kWh/kW");
+	        chart.data(data);
+	        chart.draw();
+
+	        // TODO load empty segment chart with total roof chart
+	        // TODO can't initialize second chart while first chart is still being drawn? need callback or JS event?
+	        // if (chartID == "total_roof_chart") {
+	        // 	loadChartData([], "segment_chart");
+	        // }
+        }
 
 		function rotate() {
 			if (!rotateLeft && !rotateRight) {
@@ -535,9 +650,6 @@
             // set select function for address input
             google.maps.event.addListener(departure_autocomplete, 'place_changed', function() {
 
-            	// on place changed, show map grid overlay, prompt to rotate map
-            	changeHeading();
-
                 if (departure_autocomplete.getPlace().geometry == undefined) {
                     return;
                 }
@@ -546,8 +658,92 @@
 
             	map.setZoom(20);
             	setMaxZoom(departure_autocomplete);
+
+            	// generate API call URL
+            	let lat = departure_autocomplete.getPlace().geometry.location.lat();
+            	let lng = departure_autocomplete.getPlace().geometry.location.lng();
+            	let url = 'https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude='
+            		+lat+'&location.longitude='+lng+'0&requiredQuality=MEDIUM&key=AIzaSyBffEwkEC7pbKMa57WpjvdykDW9GZKGezQ';
+
+            	// make the buildingInsights API call
+				$.getJSON(url, function (data) {
+					// console.log(data.solarPotential);
+
+					// building insights data returned
+					$("#solar_stats").show(500);
+
+					// TODO still allow for changing heading?
+
+					// TODO hide go_back, area_inputs
+					// TODO reset map heading to zero
+					// TODO enable map interaction
+
+					// display data from insights
+					loadChartData(data.solarPotential.wholeRoofStats.sunshineQuantiles, "total_roof_chart");
+					$("#roof_area").html(data.solarPotential.wholeRoofStats.areaMeters2.toFixed(1));
+
+					// add pin to each roof segment - show stats on click
+					roofSegments = data.solarPotential.roofSegmentStats;
+					for (var i in roofMarkers) {
+						roofMarkers[i].setMap(null);
+					}
+		        	$("#segment_area").html("");
+		        	$("#segment_pitch").html("");
+		        	$("#segment_chart").html("");
+					roofMarkers = [];
+					// sort roof segments by max sunniness
+					roofSegments.sort((a, b) => b.stats.sunshineQuantiles[10] - a.stats.sunshineQuantiles[10]);
+					for (var i in roofSegments) {
+						// add index value for marker labeling
+						roofSegments[i]['index'] = parseInt(i)+1;
+						addMarker(roofSegments[i], new google.maps.LatLng(roofSegments[i].center.latitude, roofSegments[i].center.longitude));
+					}
+
+		        // no buildingInsights data - show map controls and grid overlay
+				}).fail(function(response) {
+				    if (response.status == 404) {
+						$("#solar_stats").hide();
+		            	changeHeading();
+				    }
+				});
+
             });
 		}
+
+		function addMarker(roofData, location) {
+			let icon = {
+			    url: "/image/map_marker_red.png",
+			    scaledSize: new google.maps.Size(26, 42)
+			};
+	        let marker = new google.maps.Marker({
+	            position: location,
+	            icon: icon,
+	            map: map,
+	            label: { color: '#ffff', fontSize: '10px', fontWeight: '600', text: roofData['index']+"" }
+	        });
+			// show info on click - pitchDegrees, azimuthDegrees, areaMeters2, sunshineQuantiles(max)
+	        google.maps.event.addListener(marker, 'click', function() {
+	        	// highlight marker on click
+	        	for (var i in roofMarkers) {
+					let icon = {
+					    url: "/image/map_marker_red.png",
+					    scaledSize: new google.maps.Size(26, 42)
+					};
+	        		roofMarkers[i].setIcon(icon);
+	        	}
+				let icon = {
+				    url: "/image/map_marker_blue.png",
+				    scaledSize: new google.maps.Size(26, 42)
+				};
+	        	marker.setIcon(icon);
+
+	        	// segment_area, segment_pitch, segment_chart
+	        	$("#segment_area").html(roofData.stats.areaMeters2.toFixed(1));
+	        	$("#segment_pitch").html(roofData.pitchDegrees.toFixed(1));
+				loadChartData(roofData.stats.sunshineQuantiles, "segment_chart");
+			});
+	        roofMarkers.push(marker);
+	    }
 
 		function rotateCompass(degree) {
             $("#compass").css({ WebkitTransform: 'rotate(' + degree + 'deg)'});
