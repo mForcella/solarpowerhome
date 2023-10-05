@@ -124,7 +124,6 @@
 		.note {
 			font-size: 0.7em;
 			text-align: center;
-/*			padding-top: 15px;*/
 		}
 		.info-box {
 			display: none;
@@ -138,13 +137,24 @@
 		}
 		.chart {
 			height: 200px;
-/*			display: none;*/
 		}
 		.anychart-credits {
 			display: none;
 		}
 		.center {
 			text-align: center;
+		}
+		#roof_segments {
+			display: none;
+		}
+		input[type=checkbox].segment-checkbox {
+			margin-right: 5px;
+		}
+		.segment-label {
+			transform: translateY(-1px);
+		}
+		#segment_inputs input {
+			margin-left: 15px !important;
 		}
 	</style>
 
@@ -161,7 +171,7 @@
 			<p>Enter your address below to calculate your solar array size.</p>
 			<input type="text" class="form-control" id="map_address">
 		</div>
-		<div class="col col-md-12" id="rotate_controls">
+		<div class="col col-md-12 manual-control" id="rotate_controls">
 			<p>Use the controls below to orient your solar array area (e.g. roof lines) parallel with the grid lines. Click 'Confirm' when done. </p>
 			<div class="col col-md-6" id="rotate_buttons">
 				<div class="row btn-row">
@@ -172,25 +182,25 @@
 					<button class="btn btn-primary btn-confirm" onclick="confirmHeading()">Confirm Map Heading</button>
 				</div>
 			</div>
-			<div class="col col-md-6" id="compass">
+			<div class="col col-md-6 manual-control" id="compass">
 				<img src="/image/compass.svg">
 			</div>
 		</div>
-		<div class="col col-md-12" id="go_back">
+		<div class="col col-md-12 manual-control" id="go_back">
 			<button class="btn btn-primary" onclick="changeHeading()">Adjust Map Location, Zoom, Heading</button>
 		</div>
-		<div class="col col-md-12" id="solar_stats">
+		<div class="col col-md-12 auto-control" id="solar_stats">
 			<div class="col col-md-4">
 				<label class="control-label">Total Roof Area (m<sup>2</sup>)</label>
 				<p class="form-control" id="roof_area"></p>
 			</div>
 			<div class="col col-md-4">
 					<label class="control-label">Roof Segment Area (m<sup>2</sup>)</label>
-					<p class="form-control" id="segment_area"></p>
+					<p class="form-control segment-control" id="segment_area"></p>
 			</div>
 			<div class="col col-md-4">
 					<label class="control-label">Roof Segment Pitch Degrees</label>
-					<p class="form-control" id="segment_pitch"></p>
+					<p class="form-control segment-control" id="segment_pitch"></p>
 			</div>
 			<div class="col col-md-6 center">
 				<label class="control-label info" id="max_sun_info">Total Roof Sunniness Per Year <i class="fa-solid fa-circle-info"></i></label>
@@ -206,35 +216,39 @@
 					Sunshine hours are a measure of the total amount of insolation (energy) received per year. 1 sunshine hour = 1 kWh per kW (where kW refers to kW of capacity under Standard Testing Conditions).<br><br>
 					The Solar API defines "sunniness" as the level of sunlight received by a particular section of a roof relative to the rest of the roof, annually on average. Some parts of a roof may be darker than others, due to shade from nearby buildings or tree cover, while other parts of a roof may be fully exposed to the sky at all times and therefore receive more sunlight.<br><br>
 					Because the sunniness will vary from one part of the roof to another, the sunniness value is represented not by a single number but by a range, which will vary from the least sunny 1% of a roof area to the most sunny 1% of a roof area.</span>
-				<div class="chart" id="segment_chart"></div>
+				<div class="chart segment-control" id="segment_chart"></div>
 			</div>
 			<div class="col col-md-12">
 				<p class="note">*Building and solar data provided by Google Maps Solar API</p>
 			</div>
-			<!-- TODO need a way to specify which roof segments to select for panels -->
-			<!-- show numbered checklist of segments w/ stats: area, max sunniness, avg sunniness -->
-
-			<!-- TODO need to set roof segment data to area inputs - size, pitch, heading, etc -->
-
-			<!-- TODO need to show 'jump to configurator' page -->
 		</div>
 	</div>
+
 	<div class="content row" id="map_container">
+
 		<div class="col col-md-12 map-col">
     		<div id="map" class="map"></div>
-    		<div id="map_overlay"></div>
+    		<div class="manual-control" id="map_overlay"></div>
     		<canvas id="shape_canvas" class="shape-canvas" height="450"></canvas>
 		</div>
+
+		<div class="col-md-4" id="roof_segments">
+			<h4>Select the roof segments below to which you would like to add solar panels. Click the map markers to see segment details.</h4>
+			<div class="segment-control" id="segment_inputs"></div>
+		</div>
+
 		<form class="col col-md-12" id="area_inputs" method="post" action="configurator.php">
 			<button class="btn btn-primary" type="button" id="finish_btn" onclick="finishConfig()" disabled>Confirm Array Configuration</button>
 			<label class="control-label">Total array area (square meters)</label>
 			<input type="number" readonly id="total_area" value="0">
-			<button class="btn btn-primary" type="button" onclick="clearMap()">Clear Map</button>
-			<button class="btn btn-primary" type="button" onclick="undo()">Undo</button>
+			<button class="btn btn-primary manual-control" type="button" onclick="clearMap()">Clear Map</button>
+			<button class="btn btn-primary manual-control" type="button" onclick="undo()">Undo</button>
+			<div class="manual-control" id="shape_inputs"></div>
 		</form>
+
 	</div>
 
-	<!-- TODO need option - 'skip and jump to configurator' -->
+	<!-- TODO need button - 'skip and jump to configurator' -->
 
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
@@ -249,7 +263,8 @@
 		let maxZoomService;
 		var rotateRight, rotateLeft = false;
 		var roofSegments;
-		let roofMarkers;
+		var roofMarkers;
+		var segmentMarkers = [];
 
 		// shape drawing variables
 		var overlayView;
@@ -323,7 +338,7 @@
 	        chart.draw();
 
 	        // TODO load empty segment chart with total roof chart
-	        // TODO can't initialize second chart while first chart is still being drawn? need callback or JS event?
+	        // can't initialize second chart while first chart is still being drawn? need callback or JS event?
 	        // if (chartID == "total_roof_chart") {
 	        // 	loadChartData([], "segment_chart");
 	        // }
@@ -348,9 +363,9 @@
 	        	$("#rotate_controls").show(500);
 	        	$("#compass").show(500);
 	        	$("#area_inputs").hide(500);
+	    		// disable canvas drawing
 	        	$("#map").css("pointer-events","auto");
 	    		$("#shape_canvas").css("pointer-events","none");
-	    		// disable canvas drawing
 	    		$(".shape-canvas").css("pointer-events","none");
 			});
 		}
@@ -400,7 +415,7 @@
 			let row = $('<div />', {
 				'class': "area-row",
 				'id': "row_"+iterator_id
-			}).appendTo($("#area_inputs"));
+			}).appendTo($("#shape_inputs"));
 			$('<label />', {
 				'class': "control-label",
 				'text': "Array Dimensions (m)"
@@ -659,6 +674,12 @@
             	map.setZoom(20);
             	setMaxZoom(departure_autocomplete);
 
+            	// clear any segment panel markers
+				for (var i in segmentMarkers) {
+					segmentMarkers[i].setMap(null);
+				}
+				segmentMarkers = [];
+
             	// generate API call URL
             	let lat = departure_autocomplete.getPlace().geometry.location.lat();
             	let lng = departure_autocomplete.getPlace().geometry.location.lng();
@@ -667,16 +688,25 @@
 
             	// make the buildingInsights API call
 				$.getJSON(url, function (data) {
-					// console.log(data.solarPotential);
+					console.log(data.solarPotential);
 
 					// building insights data returned
-					$("#solar_stats").show(500);
+					$("#roof_segments").css("display", "inline-block");
+				    if ($(".map-col").hasClass("col-md-12")) {
+					    $(".map-col").toggleClass("col-md-12");
+					    $(".map-col").toggleClass("col-md-8");
+				    }
 
-					// TODO still allow for changing heading?
+					// hide/show inputs and elements
+					$('.auto-control').show(500);
+					$(".manual-control").hide(500);
+					$("#area_inputs").show(500);
 
-					// TODO hide go_back, area_inputs
-					// TODO reset map heading to zero
-					// TODO enable map interaction
+					// reset map heading to zero and enable map interaction
+					map.setHeading(0);
+		        	$("#map").css("pointer-events","auto");
+		    		$("#shape_canvas").css("pointer-events","none");
+		    		$(".shape-canvas").css("pointer-events","none");
 
 					// display data from insights
 					loadChartData(data.solarPotential.wholeRoofStats.sunshineQuantiles, "total_roof_chart");
@@ -687,27 +717,140 @@
 					for (var i in roofMarkers) {
 						roofMarkers[i].setMap(null);
 					}
-		        	$("#segment_area").html("");
-		        	$("#segment_pitch").html("");
-		        	$("#segment_chart").html("");
+		        	$(".segment-control").html("");
 					roofMarkers = [];
-					// sort roof segments by max sunniness
-					roofSegments.sort((a, b) => b.stats.sunshineQuantiles[10] - a.stats.sunshineQuantiles[10]);
 					for (var i in roofSegments) {
 						// add index value for marker labeling
 						roofSegments[i]['index'] = parseInt(i)+1;
 						addMarker(roofSegments[i], new google.maps.LatLng(roofSegments[i].center.latitude, roofSegments[i].center.longitude));
+						// create checkbox list
+						let row = $('<div />', {
+							'class': "segment-row"
+						}).appendTo($("#segment_inputs"));
+						let checkbox = $('<input />', {
+							'type': "checkbox",
+							'class': "segment-checkbox",
+							'id': "checkbox_"+roofSegments[i]['index']
+						}).appendTo(row);
+						$('<label />', {
+							'class': "control-label segment-label",
+							'for': "checkbox_"+roofSegments[i]['index'],
+							'html': "Segment "+roofSegments[i]['index']+" - Area: "+roofSegments[i].stats.areaMeters2.toFixed(1)+" m<sup>2</sup>"
+						}).appendTo(row);
+
+						// change markers to yellow on select - update roofSegments array, set 'checked' value to true
+						checkbox.change(function() {
+							let roof_segment_id = this.id.split("checkbox_")[1];
+							let marker = roofMarkers[parseInt(roof_segment_id)-1];
+							// if marker icon is blue, don't change color
+							if (marker.icon.url != "/image/map_marker_blue.png") {
+								let icon = {
+								    url: this.checked ? "/image/map_marker_yellow.png" : "/image/map_marker_red.png",
+								    scaledSize: new google.maps.Size(26, 42)
+								};
+								marker.setIcon(icon);
+							}
+							roofSegments[parseInt(roof_segment_id)-1]['checked'] = this.checked;
+
+							// grab solar panel configs - draw spots on map to show panel locations
+							let solarPanels = data.solarPotential.solarPanels;
+							if (!this.checked) {
+								// remove markers from map
+								for (var j in segmentMarkers) {
+									if (parseInt(segmentMarkers[j].data) == roof_segment_id) {
+										segmentMarkers[j].setMap(null);
+									}
+								}
+							} else {
+								let northmost = null;
+								let southmost = null;
+								let segmentPanels = [];
+								for (var j in solarPanels) {
+									if (solarPanels[j].segmentIndex+1 == roof_segment_id) {
+										segmentPanels.push(solarPanels[j]);
+										let icon = {
+										    url: "/image/red-dot.png",
+										    scaledSize: new google.maps.Size(5, 5)
+										};
+								        let marker = new google.maps.Marker({
+								            position: new google.maps.LatLng(solarPanels[j].center.latitude, solarPanels[j].center.longitude),
+								            icon: icon,
+								            map: map,
+								            data: roof_segment_id
+								        });
+								        segmentMarkers.push(marker);
+								        northmost = northmost == null || northmost.center.latitude < solarPanels[j].center.latitude ? solarPanels[j] : northmost;
+								        southmost = southmost == null || southmost.center.latitude > solarPanels[j].center.latitude ? solarPanels[j] : southmost;
+									}
+								}
+								// from northmost point, find points in line with heading
+								// let azimuth = roofSegments[roof_segment_id-1].azimuthDegrees;
+								// drawEdge(azimuth, northmost, segmentPanels);
+								// drawEdge(azimuth+90, northmost, segmentPanels);
+								// drawEdge(azimuth, southmost, segmentPanels);
+								// drawEdge(azimuth+90, southmost, segmentPanels);
+
+								// TODO on segment checked, add inputs to area_inputs form
+
+								// TODO skip configurator page if we have building insights data, use solarPanelConfigs data instead?
+								// then we can't choose the panel for the configuration...
+
+							}
+
+						});
 					}
 
 		        // no buildingInsights data - show map controls and grid overlay
 				}).fail(function(response) {
 				    if (response.status == 404) {
-						$("#solar_stats").hide();
+						$('.auto-control').hide(500);
 		            	changeHeading();
+				    }
+					$("#roof_segments").hide();
+				    if ($(".map-col").hasClass("col-md-8")) {
+					    $(".map-col").toggleClass("col-md-12");
+					    $(".map-col").toggleClass("col-md-8");
 				    }
 				});
 
             });
+		}
+
+		// draw a line from the corner point through any along the same heading
+		function drawEdge(azimuth, corner, solarPanels) {
+			console.log(solarPanels[0]);
+			// TODO expand edge by the length/width of the solar panels
+			let coords = [];
+	        let coord = {
+	        	lat: corner.center.latitude,
+	        	lng: corner.center.longitude
+	        };
+	        coords.push(coord);
+			for (var j in solarPanels) {
+				// compute heading between corner and each point
+				var point1 = new google.maps.LatLng(corner.center.latitude, corner.center.longitude);
+				var point2 = new google.maps.LatLng(solarPanels[j].center.latitude, solarPanels[j].center.longitude);
+				var heading = google.maps.geometry.spherical.computeHeading(point1,point2);
+				heading = heading < 0 ? 360 + heading : heading;
+				if ( (heading - azimuth < 3 && heading - azimuth > -3) 
+					|| (heading - (azimuth+180) < 3 && heading - (azimuth+180) > -3)
+					|| (heading - (azimuth-180) < 3 && heading - (azimuth-180) > -3) ) {
+			        let coord = {
+			        	lat: solarPanels[j].center.latitude,
+			        	lng: solarPanels[j].center.longitude
+			        };
+			        coords.push(coord);
+				}
+			}
+
+			// add line to map
+			let polygon = new google.maps.Polygon({
+				paths: coords,
+			    strokeColor: "#FF0000",
+			    strokeOpacity: 0.8,
+			    strokeWeight: 2,
+			});
+			polygon.setMap(map);
 		}
 
 		function addMarker(roofData, location) {
@@ -719,18 +862,19 @@
 	            position: location,
 	            icon: icon,
 	            map: map,
-	            label: { color: '#ffff', fontSize: '10px', fontWeight: '600', text: roofData['index']+"" }
+	            label: { color: 'black', fontSize: '10px', fontWeight: '600', text: roofData['index']+"" }
 	        });
 			// show info on click - pitchDegrees, azimuthDegrees, areaMeters2, sunshineQuantiles(max)
 	        google.maps.event.addListener(marker, 'click', function() {
-	        	// highlight marker on click
+	        	// remove blue highlighting from other markers - if roof segment is checked, use yellow marker instead of red
 	        	for (var i in roofMarkers) {
 					let icon = {
-					    url: "/image/map_marker_red.png",
+			    		url: roofSegments[i]['checked'] ? "/image/map_marker_yellow.png" : "/image/map_marker_red.png",
 					    scaledSize: new google.maps.Size(26, 42)
 					};
 	        		roofMarkers[i].setIcon(icon);
 	        	}
+	        	// highlight clicked marker in blue
 				let icon = {
 				    url: "/image/map_marker_blue.png",
 				    scaledSize: new google.maps.Size(26, 42)
@@ -750,7 +894,7 @@
             $("#compass").css({ '-moz-transform': 'rotate(' + degree + 'deg)'});
         }
 
-		// make sure map is set to 20, or the maximum allowable zoom for the current map location
+		// make sure map zoom is set to min 20, or the maximum allowable zoom for the current map location
 		function setMaxZoom(departure_autocomplete) {
 			let latLng = departure_autocomplete.getPlace().geometry.location;
 			maxZoomService.getMaxZoomAtLatLng(latLng, (result) => {
