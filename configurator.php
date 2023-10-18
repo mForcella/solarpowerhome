@@ -53,6 +53,10 @@
 			width: 150px;
 			padding: 5px 0;
 		}
+		.panel-col label {
+			width: auto !important;
+			margin-right: 5px;
+		}
 		#canvases input.form-control {
 			width: 100px;
 			display: inline;
@@ -61,6 +65,13 @@
 			height: 100px;
 			margin-left: 50px;
 			margin-bottom: 30px;
+		}
+		.panel-col {
+			margin-top: 15px;
+			float: right;
+		}
+		.slider-col {
+			margin-top: 15px;
 		}
 		.slider {
 			-webkit-appearance: none;
@@ -168,7 +179,7 @@
 
 	</div>
 
-	<!-- TODO add manual controls if dimensions are known -->
+	<!-- TODO add manual controls if dimensions are known - no shapes found -->
 
 	<!-- TODO button to confirm and get quote -->
 
@@ -184,8 +195,10 @@
 			"REC Pure 400" : [181.2,101.6]
 		};
 
+		let canvas_max_width = $("#canvases").width();
 		var polygon_count = 0; // iterator for setting canvas ID values
 		var polygon_vals = <?php echo json_encode(isset($_POST["polygons"]) ? $_POST["polygons"] : []); ?>;
+		var heading_vals = <?php echo json_encode(isset($_POST["headings"]) ? $_POST["headings"] : []); ?>;
 		var polygons = [];
 		// parse shape values
 		for (var i in polygon_vals) {
@@ -200,6 +213,8 @@
 			} else {
 				l_w.push(s2);
 				l_w.push(s1);
+				// adjust heading if shape is flipped
+				heading_vals[i] = parseFloat(heading_vals[i]) + 90;
 			}
 			vals['length_width'] = l_w;
 			vals['pitch'] = 40;
@@ -239,18 +254,19 @@
 				let pixels_per_cm = (canvas_width / (area_width * 100)).toFixed(3);
 				// let panel_width_pixels = (panel_dimensions[1] * pixels_per_cm).toFixed(3);
 
-				let panels_x = Math.floor((canvas_width)/(panel_dimensions[1]*pixels_per_cm));
-				let panels_y = Math.floor((canvas_height)/(panel_dimensions[0]*pixels_per_cm));
+				let landscape = $("#dir_"+i).hasClass("fa-arrows-left-right");
+				let panels_x = Math.floor((canvas_width)/(panel_dimensions[landscape ? 0 : 1]*pixels_per_cm));
+				let panels_y = Math.floor((canvas_height)/(panel_dimensions[landscape ? 1 : 0]*pixels_per_cm));
 
 				var startX = 0;
 				var startY = 0;
 				var panelsLaid = 0;
 				while (panelsLaid < panels_x * panels_y) {
 			    	panelsLaid++;
-			    	startX = startX + panel_dimensions[1] * pixels_per_cm;
+			    	startX = startX + panel_dimensions[landscape ? 0 : 1] * pixels_per_cm;
 		    		if (panelsLaid % panels_x == 0) {
 			    		startX = 0;
-			    		startY = startY + panel_dimensions[0] * pixels_per_cm;
+			    		startY = startY + panel_dimensions[landscape ? 1 : 0] * pixels_per_cm;
 			    	}
 				}
 			    // set slider max value from panel count
@@ -259,13 +275,13 @@
 			    $("#pcount_"+i).val(panelsLaid);
 
 				// set panels onto canvas
-			    drawPanels(canvas, area_width, panel_dimensions, $("#s_"+i).val());
+			    drawPanels(canvas, area_width, panel_dimensions, $("#s_"+i).val(), landscape);
 			}
 
 		});
 
  		// draw the selected solar panels onto a canvas
-		function drawPanels(canvas, areaWidth, panelDimensions, panelSelected) {
+		function drawPanels(canvas, areaWidth, panelDimensions, panelSelected, landscape) {
 			let ctx = canvas.getContext("2d");
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			ctx.beginPath();
@@ -279,8 +295,9 @@
 			let pixels_per_cm = (canvas_width / (areaWidth * 100)).toFixed(3);
 			// let panel_width_pixels = (panelDimensions[1] * pixels_per_cm).toFixed(3);
 
-			let panels_x = Math.floor((canvas_width)/(panelDimensions[1]*pixels_per_cm));
-			let panels_y = Math.floor((canvas_height)/(panelDimensions[0]*pixels_per_cm));
+			// swap panel dimensions if pitch direction has been changed (landscape)
+			let panels_x = Math.floor((canvas_width)/(panelDimensions[landscape ? 0 : 1]*pixels_per_cm));
+			let panels_y = Math.floor((canvas_height)/(panelDimensions[landscape ? 1 : 0]*pixels_per_cm));
 
 			// set shapes onto canvas
 			var startX = 0;
@@ -292,13 +309,13 @@
 		    		ctx.beginPath();
 					ctx.fillStyle = "lightgray";
 		    	}
-		    	ctx.rect(startX, startY, panelDimensions[1] * pixels_per_cm, panelDimensions[0] * pixels_per_cm);
+		    	ctx.rect(startX, startY, panelDimensions[landscape ? 0 : 1] * pixels_per_cm, panelDimensions[landscape ? 1 : 0] * pixels_per_cm);
 		    	ctx.fill();
 		    	ctx.stroke();
-		    	startX = startX + panelDimensions[1] * pixels_per_cm;
+		    	startX = startX + panelDimensions[landscape ? 0 : 1] * pixels_per_cm;
 		    	if (panelsLaid % panels_x == 0) {
 		    		startX = 0;
-		    		startY = startY + panelDimensions[0] * pixels_per_cm;
+		    		startY = startY + panelDimensions[landscape ? 1 : 0] * pixels_per_cm;
 		    	}
 			}
 		}
@@ -319,17 +336,18 @@
 	        	$(new_canvas).attr("id", "canvas_"+polygon_count);
 
 				// append array info
-				let row = $('<div />').appendTo($("#canvases"));
+				let row1 = $('<div />').appendTo($("#canvases"));
 				$('<p />', {
 					'class': "control-label title center",
 					'text': "Array Area #" + (polygon_count+1)
-				}).appendTo($(row));
+				}).appendTo($(row1));
 
 				// COLUMN 1
+				let row2 = $('<div />').appendTo($("#canvases"));
 				let col = $('<div />', {
-					'class': "col-md-6"
-				}).appendTo($("#canvases"));
-				row = $('<div />').appendTo($(col));
+					'class': "col-xs-6"
+				}).appendTo($(row2));
+				let row = $('<div />').appendTo($(col));
 				let label = $('<label />', {
 					'class': "control-label",
 					'text': "Length (m):"
@@ -361,10 +379,6 @@
 					'readOnly': true
 				}).appendTo($(row));
 
-				// COLUMN 2
-				col = $('<div />', {
-					'class': "col-md-6"
-				}).appendTo($("#canvases"));
 				row = $('<div />').appendTo($(col));
 				$('<label />', {
 					'class': "control-label",
@@ -407,33 +421,43 @@
 					$("#panel_select").trigger("change");
 				});
 
-				row = $('<div />', {
-					'class': "col-md-12 center margin-bottom"
-				}).appendTo($("#canvases"));
+				// COLUMN 2 - compass heading
+				col = $('<div />', {
+					'class': "col-xs-6"
+				}).appendTo($(row2));
+				let compass = $('<img />', {
+					'id': "compass_"+polygon_count,
+					'class': "compass",
+					'src': '/image/compass.svg'
+				}).appendTo($(col));
+				let heading = parseFloat(heading_vals[i]);
+				rotateCompass(compass, heading);
+
+				// COLUMN 1 - PANEL COUNT
+				let row3 = $('<div />').appendTo($("#canvases"));
+				col = $('<div />', {
+					'class': "col-xs-5 panel-col"
+				}).appendTo($(row3));
 				$('<label />', {
 					'class': "control-label",
 					'text': "Panels Placed:"
-				}).appendTo($(row));
+				}).appendTo($(col));
 				$('<input />', {
 					'class': "form-control",
 					'id': "pcount_"+polygon_count,
 					'readOnly': true
-				}).appendTo($(row));
+				}).appendTo($(col));
 
-				// // add compass icon to show heading
-				// let compass = $('<img />', {
-				// 	'class': "compass",
-				// 	'src': '/image/compass.svg'
-				// }).appendTo($("#canvases"));
-				// rotateCompass(compass, heading);
-
-				// add slider
+				// COLUMN 2 - SLIDER
+				col = $('<div />', {
+					'class': "col-xs-7 slider-col"
+				}).appendTo($(row3));
 				let slider = $('<input />', {
 					'id': "s_"+polygon_count,
 					'class': "slider",
 					'type': "range",
 					'min': 0
-				}).appendTo($("#canvases"));
+				}).appendTo($(col));
 				$(slider).on("input", function() {
 					setSlider($(this).val(), this.id.split("_")[1]);
 				});
@@ -444,6 +468,12 @@
 
 			}
 		}
+
+		// set the compass icon rotation based on a heading
+		function rotateCompass(compass, heading) {
+            $(compass).css({ WebkitTransform: 'rotate(' + heading + 'deg)'});
+            $(compass).css({ '-moz-transform': 'rotate(' + heading + 'deg)'});
+        }
 
 		// adjust polygon values based on pitch and direction
 		function getAdjustedPolygonValues() {
@@ -466,8 +496,8 @@
 		function cloneCanvas(length, width) {
 			let maxLength = getMaxLength();
 			let scale = length / maxLength;
-			let canvas_width = 800 * scale;
-			let canvas_height = width / length * 800 * scale;
+			let canvas_width = canvas_max_width * scale;
+			let canvas_height = width / length * canvas_max_width * scale;
         	let new_canvas = $("#shape_canvas").clone();
         	$(new_canvas).attr("width", canvas_width);
         	$(new_canvas).attr("height", canvas_height);
@@ -480,15 +510,9 @@
 			let areaWidth = adjustedPolygons[id][0];
 			let panelDimensions = panels[$("#panel_select").val()];
 			let panelSelected = val;
-			drawPanels(canvas, areaWidth, panelDimensions, panelSelected);
+			drawPanels(canvas, areaWidth, panelDimensions, panelSelected, $("#dir_"+id).hasClass("fa-arrows-left-right"));
 			$("#pcount_"+id).val(val);
 		}
-
-		// // set the compass icon rotation based on a heading
-		// function rotateCompass(e, degree) {
-        //     $(e).css({ WebkitTransform: 'rotate(' + degree + 'deg)'});
-        //     $(e).css({ '-moz-transform': 'rotate(' + degree + 'deg)'});
-        // }
 
  		// calculate a length taking pitch into account
 		function lengthWithPitch(length, pitch) {
@@ -500,7 +524,7 @@
 		function getMaxLength() {
 			let maxLength = 0;
 			for (var i in adjustedPolygons) {
-				let length = adjustedPolygons[i][0];
+				let length = parseFloat(adjustedPolygons[i][0]);
 				maxLength = length > maxLength ? length : maxLength;
 			}
 			return maxLength;
