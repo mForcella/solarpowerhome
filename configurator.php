@@ -69,6 +69,8 @@
 		.panel-col {
 			margin-top: 15px;
 			float: right;
+			text-align: right;
+			padding-right: 0;
 		}
 		.slider-col {
 			margin-top: 15px;
@@ -124,6 +126,10 @@
 		.margin-bottom {
 			margin-bottom: 15px;
 		}
+		#conf_btn {
+			text-transform: uppercase;
+			margin-bottom: 50px;
+		}
 	</style>
 
 </head>
@@ -144,7 +150,7 @@
 				}
 				$iterator = 0;
 				foreach ($_POST["headings"] as $heading) {
-					echo "<input class='' type='hidden' value='$heading' id='h_$iterator'></input>";
+					echo "<input class='heading' type='hidden' value='$heading' id='h_$iterator'></input>";
 					$iterator++;
 				}
 			}
@@ -153,23 +159,29 @@
 
 	<div class="content">
 
-		<!-- select panel -->
-		<div class="section">
-			<label class="control-label">Select your panel type</label>
-			<select class="form-control" id="panel_select">
-				<option value="REC Pure 400">REC Pure 400</option>
-			</select>
-			<!-- selected panel specifications -->
-			<div id="panel_specs"></div>
-		</div>
+		<form id="config_vals" method="post" action="report.php">
 
-		<!-- select inverter -->
-		<div class="section">
-			<label class="control-label">Select your inverter type</label>
-			<select class="form-control">
-				<option value="Enphase IQ8M-72-2-US">Enphase IQ8M-72-2-US</option>
-			</select>
-		</div>
+			<!-- select panel -->
+			<div class="section">
+				<label class="control-label">Select your panel type</label>
+				<select class="form-control" id="panel_select" name="panel">
+					<option value="REC Pure 400">REC Pure 400</option>
+				</select>
+				<!-- selected panel specifications -->
+				<div id="panel_specs"></div>
+			</div>
+
+			<!-- select inverter -->
+			<div class="section">
+				<label class="control-label">Select your inverter type</label>
+				<select class="form-control" id="inverter_select" name="inverter">
+					<option value="Enphase IQ8M-72-2-US">Enphase IQ8M-72-2-US</option>
+				</select>
+			</div>
+
+			<input type="hidden" id="panel_count" name="panel_count">
+
+		</form>
 
 		<!-- panel canvases -->
 		<div id="canvases"></div>
@@ -182,11 +194,14 @@
 	<!-- TODO add manual controls if dimensions are known - no shapes found -->
 
 	<!-- TODO button to confirm and get quote -->
+	<div class="center">
+	<button id="conf_btn" type="button" class="btn btn-primary" onclick="getQuote()">Confirm and get quote</button>
+	</div>
 
 
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
-	<script src="/themes/solar-power-theme/js/process_shapes.js"></script>
+	<!-- <script src="/themes/solar-power-theme/js/process_shapes.js"></script> -->
 
 	<script type="text/javascript">
 
@@ -416,6 +431,7 @@
 					let id = this.id.split("dir_")[1];
 					polygons[id]['left_right'] = $(this).hasClass("fa-arrows-left-right");
 					// recalculate polygons and redraw shapes
+					// TODO on rotate pitch direction, maintain canvas max height
 					adjustedPolygons = getAdjustedPolygonValues();
 					setCanvases();
 					$("#panel_select").trigger("change");
@@ -436,21 +452,21 @@
 				// COLUMN 1 - PANEL COUNT
 				let row3 = $('<div />').appendTo($("#canvases"));
 				col = $('<div />', {
-					'class': "col-xs-5 panel-col"
+					'class': "col-xs-4 panel-col"
 				}).appendTo($(row3));
 				$('<label />', {
 					'class': "control-label",
 					'text': "Panels Placed:"
 				}).appendTo($(col));
 				$('<input />', {
-					'class': "form-control",
+					'class': "form-control panel-count",
 					'id': "pcount_"+polygon_count,
 					'readOnly': true
 				}).appendTo($(col));
 
 				// COLUMN 2 - SLIDER
 				col = $('<div />', {
-					'class': "col-xs-7 slider-col"
+					'class': "col-xs-8 slider-col"
 				}).appendTo($(row3));
 				let slider = $('<input />', {
 					'id': "s_"+polygon_count,
@@ -462,6 +478,7 @@
 					setSlider($(this).val(), this.id.split("_")[1]);
 				});
 
+				// TODO add ruler along canvas edge to show dimensions
 	        	$("#canvases").append(new_canvas);
 	        	$(new_canvas).show();
 				polygon_count++;
@@ -512,6 +529,7 @@
 			let panelSelected = val;
 			drawPanels(canvas, areaWidth, panelDimensions, panelSelected, $("#dir_"+id).hasClass("fa-arrows-left-right"));
 			$("#pcount_"+id).val(val);
+			// TODO allow click to select/deselect specific panels - store panel selections in 2D arrays
 		}
 
  		// calculate a length taking pitch into account
@@ -528,6 +546,20 @@
 				maxLength = length > maxLength ? length : maxLength;
 			}
 			return maxLength;
+		}
+
+		function getQuote() {
+			// get config information - panel model, inverter model, panel count
+			let panel = $("#panel_select").val();
+			let inverter = $("#inverter_select").val();
+			var panel_count = 0;
+			$(".panel-count").each(function() {
+				panel_count += parseInt($(this).val());
+			});
+			// submit form values
+			$("#panel_count").val(panel_count);
+			$("#config_vals").submit();
+			// TODO form needs to connect to python api...
 		}
 
 		// TODO if no shapes are found, enable manually setting dimensions

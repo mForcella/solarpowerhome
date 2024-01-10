@@ -184,6 +184,7 @@
 			</div>
 			<div class="col col-md-6 manual-control" id="compass">
 				<img src="/image/compass.svg">
+				<!-- <img src="/wp-content/uploads/2023/11/compass.svg"> -->
 			</div>
 		</div>
 		<div class="col col-md-12 manual-control" id="go_back">
@@ -238,6 +239,7 @@
 		</div>
 
 		<form class="col col-md-12" id="area_inputs" method="post" action="configurator.php">
+		<!-- <form class="col col-md-12" id="area_inputs" method="post" action="/configurator/"> -->
 			<button class="btn btn-primary" type="button" id="finish_btn" onclick="finishConfig()" disabled>Confirm Array Configuration</button>
 			<label class="control-label">Total array area (square meters)</label>
 			<input type="number" readonly id="total_area" value="0">
@@ -253,6 +255,7 @@
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
 	<!-- <script src="assets/js/building-insights.js"></script> -->
+	<script src="assets/js/html2canvas.min.js"></script>
 	<!-- Font Awesome Icons - https://fontawesome.com/icons -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/js/all.min.js"></script>
 	<!-- AnyChart documentation - https://api.anychart.com/ -->
@@ -452,7 +455,7 @@
 		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY+height)));
 		    width = height = 0;
 
-			// TODO grab screenshot of shape area
+			// TODO grab screenshot of selected shape area?
 
 		    for (var i in points) {
 		    	if (isNaN(points[i].lat()) || isNaN(points[i].lng())) {
@@ -602,7 +605,7 @@
 			// check for WebGL support
 			const canvas = document.createElement("canvas");
 			canvas.getContext("webgl2") ? 
-				console.log("WebGL2 supported") : alert("WebGL 2 is not supported. Some map functions may not work as expected.");
+				console.log("WebGL2 supported") : alert("WebGL 2 is not supported. Some map functions may not work as expected. Please update your browser to the latest version to maximize compatibility.");
 
 		    map = new google.maps.Map(document.getElementById('map'), {
 		        center: {lat: 41.798057, lng: -93.973488},
@@ -615,7 +618,8 @@
 		    // check for vector map initialization
 		    map.addListener("renderingtype_changed", () => {
 		    	map.getRenderingType() == "VECTOR" ? 
-		    		console.log("Vector map successfully initialized") : alert("Vector map failed to initialize. Some map functions may not work as expected.");
+		    		console.log("Vector map successfully initialized") : alert("Vector map failed to initialize. Some map functions may not work as expected. Please update your browser to the latest version to maximize compatibility.");
+		    		// TODO if vector map did not initialize, hide the rotation controls
 			});
 
 			// rotate compass image
