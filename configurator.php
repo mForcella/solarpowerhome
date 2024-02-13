@@ -1,3 +1,12 @@
+<?php 
+
+	// get map values
+	$latitude = isset($_POST["latitude"]) ? $_POST["latitude"] : "";
+	$longitude = isset($_POST["longitude"]) ? $_POST["longitude"] : "";
+	$altitude = isset($_POST["altitude"]) ? $_POST["altitude"] : "";
+
+?>
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -179,7 +188,14 @@
 				</select>
 			</div>
 
-			<input type="hidden" id="panel_count" name="panel_count">
+			<input type="hidden" id="segment_count" name="segment_count" value="<?php echo count($_POST["polygons"]) ?>">
+			<input type="hidden" name="submit_url" id="submit_url">
+
+			<?php 
+				echo "<input type='hidden' value='$latitude' name='latitude'></input>";
+				echo "<input type='hidden' value='$longitude' name='longitude'></input>";
+				echo "<input type='hidden' value='$altitude' name='altitude'></input>";
+			?>
 
 		</form>
 
@@ -193,7 +209,6 @@
 
 	<!-- TODO add manual controls if dimensions are known - no shapes found -->
 
-	<!-- TODO button to confirm and get quote -->
 	<div class="center">
 	<button id="conf_btn" type="button" class="btn btn-primary" onclick="getQuote()">Confirm and get quote</button>
 	</div>
@@ -229,10 +244,11 @@
 				l_w.push(s2);
 				l_w.push(s1);
 				// adjust heading if shape is flipped
-				heading_vals[i] = parseFloat(heading_vals[i]) + 90;
+				// heading_vals[i] = parseFloat(heading_vals[i]) + 90;
 			}
 			vals['length_width'] = l_w;
-			vals['pitch'] = 40;
+			vals['heading'] = heading_vals[i];
+			vals['pitch'] = 30;
 			vals['left_right'] = false;
 			polygons.push(vals);
 		}
@@ -397,6 +413,19 @@
 				row = $('<div />').appendTo($(col));
 				$('<label />', {
 					'class': "control-label",
+					'text': "Roof Heading:"
+				}).appendTo($(row));
+				$('<input />', {
+					'class': "form-control",
+					'id': "heading_"+polygon_count,
+					'type': "number",
+					'value': polygons[polygon_count]['heading'],
+					'readOnly': true
+				}).appendTo($(row));
+
+				row = $('<div />').appendTo($(col));
+				$('<label />', {
+					'class': "control-label",
 					'text': "Roof Pitch:"
 				}).appendTo($(row));
 				let pitch_val = $('<input />', {
@@ -416,26 +445,26 @@
 					$("#panel_select").trigger("change");
 				});
 
-				row = $('<div />').appendTo($(col));
-				$('<label />', {
-					'class': "control-label",
-					'text': "Direction of Pitch:"
-				}).appendTo($(row));
-				let pitch_dir = $('<i />', {
-					'class': polygons[polygon_count]['left_right'] ? "fa-solid arrows fa-arrows-left-right" : "fa-solid arrows fa-arrows-up-down",
-					'id': "dir_"+polygon_count
-				}).appendTo($(row));
-				$(pitch_dir).on("click", function() {
-					$(this).toggleClass("fa-arrows-up-down");
-					$(this).toggleClass("fa-arrows-left-right");
-					let id = this.id.split("dir_")[1];
-					polygons[id]['left_right'] = $(this).hasClass("fa-arrows-left-right");
-					// recalculate polygons and redraw shapes
-					// TODO on rotate pitch direction, maintain canvas max height
-					adjustedPolygons = getAdjustedPolygonValues();
-					setCanvases();
-					$("#panel_select").trigger("change");
-				});
+				// row = $('<div />').appendTo($(col));
+				// $('<label />', {
+				// 	'class': "control-label",
+				// 	'text': "Direction of Pitch:"
+				// }).appendTo($(row));
+				// let pitch_dir = $('<i />', {
+				// 	'class': polygons[polygon_count]['left_right'] ? "fa-solid arrows fa-arrows-left-right" : "fa-solid arrows fa-arrows-up-down",
+				// 	'id': "dir_"+polygon_count
+				// }).appendTo($(row));
+				// $(pitch_dir).on("click", function() {
+				// 	$(this).toggleClass("fa-arrows-up-down");
+				// 	$(this).toggleClass("fa-arrows-left-right");
+				// 	let id = this.id.split("dir_")[1];
+				// 	polygons[id]['left_right'] = $(this).hasClass("fa-arrows-left-right");
+				// 	// recalculate polygons and redraw shapes
+				// 	// TODO on rotate pitch direction, maintain canvas max height?
+				// 	adjustedPolygons = getAdjustedPolygonValues();
+				// 	setCanvases();
+				// 	$("#panel_select").trigger("change");
+				// });
 
 				// COLUMN 2 - compass heading
 				col = $('<div />', {
@@ -549,17 +578,54 @@
 		}
 
 		function getQuote() {
-			// get config information - panel model, inverter model, panel count
-			let panel = $("#panel_select").val();
-			let inverter = $("#inverter_select").val();
-			var panel_count = 0;
-			$(".panel-count").each(function() {
-				panel_count += parseInt($(this).val());
-			});
-			// submit form values
-			$("#panel_count").val(panel_count);
+
+			// set form values
+			for (var i in polygons) {
+
+				$('<input />', {
+					'name': "roof_length"+i,
+					'type': "hidden",
+					'value': polygons[i]['length_width'][0]
+				}).appendTo($("#config_vals"));
+
+				$('<input />', {
+					'name': "roof_width"+i,
+					'type': "hidden",
+					'value': polygons[i]['length_width'][1]
+				}).appendTo($("#config_vals"));
+
+				$('<input />', {
+					'name': "roof_pitch"+i,
+					'type': "hidden",
+					'value': polygons[i]['pitch']
+				}).appendTo($("#config_vals"));
+
+				$('<input />', {
+					'name': "roof_direction"+i,
+					'type': "hidden",
+					'value': polygons[i]['heading']
+				}).appendTo($("#config_vals"));
+
+				$('<input />', {
+					'name': "strings_per_inverter"+i,
+					'type': "hidden",
+					'value': 1
+				}).appendTo($("#config_vals"));
+
+				$('<input />', {
+					'name': "modules_per_string"+i,
+					'type': "hidden",
+					'value': $("#pcount_"+i).val()
+				}).appendTo($("#config_vals"));
+
+			}
+
+			// make api call
+			// console.log("http://mforcella.pythonanywhere.com/?"+$("#config_vals").serialize());
+			$("#submit_url").val("http://mforcella.pythonanywhere.com/?"+$("#config_vals").serialize());
 			$("#config_vals").submit();
-			// TODO form needs to connect to python api...
+
+
 		}
 
 		// TODO if no shapes are found, enable manually setting dimensions

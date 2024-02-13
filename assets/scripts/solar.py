@@ -98,6 +98,8 @@ def solar():
         # roof_pitch = Tilt angle of the module surface. Up=0, horizon=90.
         # roof_direction = Azimuth angle of the module surface. North=0, East=90, South=180, West=270.
         # the url parameters for the roof segments will be numbered, e.g. roof_pitch0, roof_direction0, roof_pitch1, roof_direction1, etc
+        roof_length = 0 if request.args.get('roof_length'+str(i)) == None else float(request.args.get('roof_length'+str(i)))
+        roof_width = 0 if request.args.get('roof_width'+str(i)) == None else float(request.args.get('roof_width'+str(i)))
         roof_pitch = 20 if request.args.get('roof_pitch'+str(i)) == None else float(request.args.get('roof_pitch'+str(i)))
         roof_direction = 180 if request.args.get('roof_direction'+str(i)) == None else float(request.args.get('roof_direction'+str(i)))
         modules_per_string = 3 if request.args.get('modules_per_string'+str(i)) == None else int(request.args.get('modules_per_string'+str(i)))
@@ -114,6 +116,8 @@ def solar():
         )
 
         arrays.append({
+            'roof_segment_length':roof_length,
+            'roof_segment_width':roof_width,
             'roof_segment_pitch':roof_pitch,
             'roof_segment_direction':roof_direction,
             'modules_per_string':modules_per_string,

@@ -50,6 +50,10 @@
 		}
 		.btn-remove {
 			width: auto;
+			background-color: red;
+		}
+		.btn-remove:hover {
+			background-color: darkred;
 		}
 		#map_container {
 			margin-top: 15px;
@@ -230,7 +234,8 @@
 		<div class="col col-md-12 map-col">
     		<div id="map" class="map"></div>
     		<div class="manual-control" id="map_overlay"></div>
-    		<canvas id="shape_canvas" class="shape-canvas" height="450"></canvas>
+    		<!-- <canvas id="shape_canvas" class="shape-canvas" height="450"></canvas> -->
+    		<canvas id="canvas" class="shape-canvas" height="450"></canvas>
 		</div>
 
 		<div class="col-md-4" id="roof_segments">
@@ -246,8 +251,27 @@
 			<button class="btn btn-primary manual-control" type="button" onclick="clearMap()">Clear Map</button>
 			<button class="btn btn-primary manual-control" type="button" onclick="undo()">Undo</button>
 			<div class="manual-control" id="shape_inputs"></div>
+			<input type="hidden" name="latitude" id="latitude">
+			<input type="hidden" name="longitude" id="longitude">
+			<input type="hidden" name="altitude" id="altitude">
 		</form>
 
+	</div>
+
+	<div class="modal" id="info_modal" tabindex="-1" role="dialog">
+		<div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h4 class="modal-title">Set roof direction</h4>
+				</div>
+				<div class="modal-body">
+					<h4>We also need to know the direction that each of your roof segments are facing. <br>Please indicate the direction of the roof pitch by dragging a line from the peak of your roof segment to the bottom.</h4>
+		        	<div class="button-bar">
+			        	<button type="button" class="btn btn-primary" data-dismiss="modal">Ok</button>
+		        	</div>
+				</div>
+			</div>
+		</div>
 	</div>
 
 	<!-- TODO need button - 'skip and jump to configurator' - if dimensions are already known -->
@@ -264,16 +288,21 @@
 	<script type="text/javascript">
 
 		let map;
+		let markers = [];
+		// let markerCount = 0;
 		let maxZoomService;
 		var rotateRight, rotateLeft = false;
+		var userNotified = false;
 
 		// shape drawing variables
 		var overlayView;
 		var projection;
 		var overlays = [];
-		var canvases = [];
+		var polylines = [];
+		// var canvases = [];
 		var isDown = false;
-		var iterator_id = 0;
+		var lineDrawing = false;
+		var iterator_id = 1;
 		var canvas, ctx, startX, startY, offsetX, offsetY, scrollX, scrollY, height, width;
 
 		// add grid overlay to map
@@ -345,7 +374,7 @@
         		$("#compass").hide(500);
         		$(".shape-canvas").css("pointer-events","auto");
 	        	$("#area_inputs").show(500);
-	        	if (!$("#canvas_"+iterator_id).is(":visible")) {
+	        	if (!$("#canvas").is(":visible")) {
 	        		cloneCanvas();
 	        	}
         	});
@@ -355,62 +384,88 @@
 		// https://stackoverflow.com/questions/65376480/let-users-draw-rectangles-with-mouse-in-canvas-with-javascript
 		function enableShapeDrawing() {
 
-			// TODO also enable drawing irregular polygons
-
 			// calculate where the canvas is on the window
-			canvas = document.getElementById("canvas_"+iterator_id);
+			// canvas = document.getElementById("canvas_"+iterator_id);
+			canvas = document.getElementById("canvas");
 
 			// get references to the canvas and context
 			ctx = canvas.getContext("2d");
 			ctx.strokeStyle = "black";
 			ctx.lineWidth = 2;
 
-			let $canvas = $("#canvas_"+iterator_id);
+			let $canvas = $("#canvas");
 			let canvasOffset = $canvas.offset();
 			offsetX = canvasOffset.left;
 			offsetY = canvasOffset.top;
 
 			// listen for mouse events
-			$("#canvas_"+iterator_id).mousedown(function (e) { handleMouseDown(e); });
-			$("#canvas_"+iterator_id).mousemove(function (e) { handleMouseMove(e); });
-			$("#canvas_"+iterator_id).mouseup(function (e) { handleMouseUp(e); });
-			$("#canvas_"+iterator_id).mouseout(function (e) { handleMouseOut(e); });
+			$("#canvas").mousedown(function (e) { handleMouseDown(e); });
+			$("#canvas").mousemove(function (e) { handleMouseMove(e); });
+			$("#canvas").mouseup(function (e) { handleMouseUp(e); });
+			$("#canvas").mouseout(function (e) { handleMouseOut(e); });
 
 		}
 
 		function createAreaInput(s1, s2) {
+			// TODO don't hide the compass after heading is set?
+
 			// create inputs for polygon
-			let row = $('<div />', {
+			let content = $('<div />', {
 				'class': "area-row",
 				'id': "row_"+iterator_id
 			}).appendTo($("#shape_inputs"));
+
+			let row1 = $('<div />', {
+				'class': "row"
+			}).appendTo($(content));
 			$('<label />', {
 				'class': "control-label",
-				'text': "Array Dimensions (m)"
-			}).appendTo(row);
+				'text': "Segment ["+iterator_id+"] Dimensions (m)"
+			}).appendTo(row1);
 			$('<input />', {
 				'type': "text",
-				'value': s1.toFixed(2)+" x "+s2.toFixed(2)
-			}).appendTo(row);
+				'value': s1.toFixed(2)+" x "+s2.toFixed(2),
+				'readOnly': true
+			}).appendTo(row1);
+			
+			let row2 = $('<div />', {
+				'class': "row"
+			}).appendTo($(content));
+			$('<label />', {
+				'class': "control-label",
+				'text': "Segment ["+iterator_id+"] Heading"
+			}).appendTo(row2);
+			$('<input />', {
+				'type': "text",
+				'id': "heading_"+iterator_id,
+				'value': 0,
+				'readOnly': true
+			}).appendTo(row2);
+
+			let row3 = $('<div />', {
+				'class': "row"
+			}).appendTo($(content));
+			let button = $('<button />', {
+				'class': "btn btn-primary btn-remove",
+				'text': "Remove Segment "+"["+iterator_id+"]",
+				'type': "button",
+				'id': iterator_id
+			}).appendTo(row3);
+			button.on("click", function() {
+				clearMap(this.id);
+			});
+
 			$('<input />', {
 				'type': "hidden",
 				'name': "polygons[]",
 				'value': s1.toFixed(2)+","+s2.toFixed(2)
-			}).appendTo(row);
+			}).appendTo(content);
 			$('<input />', {
+				'id': "heading_val_"+iterator_id++,
 				'type': "hidden",
 				'name': "headings[]",
-				'value': map.getHeading()
-			}).appendTo(row);
-			let button = $('<button />', {
-				'class': "btn btn-primary btn-remove",
-				'text': "Remove Array",
-				'type': "button",
-				'id': iterator_id++
-			}).appendTo(row);
-			button.on("click", function() {
-				clearMap(this.id);
-			});
+				'value': 0
+			}).appendTo(content);
 		}
 
 		// begin shape drawing
@@ -432,6 +487,15 @@
 			overlayView.draw = function() {};
 			overlayView.draw();
 			overlayView.setMap(map);
+
+			if (lineDrawing) {
+				handleMouseDownLine();
+			}
+		}
+
+		function handleMouseDownLine(e) {
+		    ctx.beginPath();
+			ctx.moveTo(startX, startY);
 		}
 
 		// end shape drawing
@@ -447,6 +511,19 @@
 				return;
 			}
 
+			// determine which shape to render on canvas
+			if (lineDrawing) {
+				handleMouseUpLine();
+			} else {
+				handleMouseUpRectangle();
+			}
+
+			// clone and create new canvas object
+			// cloneCanvas();
+		}
+
+		function handleMouseUpRectangle() {
+
 		    // calculate the size of the rectangle on the canvas
 		    let points = [];
 		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY)));
@@ -455,7 +532,7 @@
 		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY+height)));
 		    width = height = 0;
 
-			// TODO grab screenshot of selected shape area?
+			// TODO grab a screenshot of selected map area?
 
 		    for (var i in points) {
 		    	if (isNaN(points[i].lat()) || isNaN(points[i].lng())) {
@@ -481,20 +558,117 @@
 
 			let s1 = google.maps.geometry.spherical.computeDistanceBetween(points[0], points[1]);
 			let s2 = google.maps.geometry.spherical.computeDistanceBetween(points[0], points[3]);
+
+			// get average lat/lng values and add map marker
+			let latMax = points[0].lat();
+			let latMin = points[0].lat();
+			let lngMax = points[0].lng();
+			let lngMin = points[0].lng();
+			for (var i = 1; i < 4; i++) {
+				latMax = points[i].lat() > latMax ? points[i].lat() : latMax;
+				lngMax = points[i].lng() > lngMax ? points[i].lng() : lngMax;
+				latMin = points[i].lat() < latMin ? points[i].lat() : latMin;
+				lngMin = points[i].lng() < lngMin ? points[i].lng() : lngMin;
+			}
+			let lat = (latMax+latMin)/2;
+			let lng = (lngMax+lngMin)/2;
+			let latLng = new google.maps.LatLng(lat, lng);
+			let marker = new google.maps.Marker({
+	            position: latLng,
+	            map: map,
+	            label: {
+					color: 'white',
+					fontWeight: 'bold',
+					fontSize: '10px',
+					text: iterator_id.toString()
+				},
+	        });
+	        markers.push(marker);
+
 			createAreaInput(s1, s2);
 			setTotalArea();
 
-			// clone and create new canvas object
-			cloneCanvas();
+			lineDrawing = true;
+
+			// TODO disable submit until heading is set
+
+			// alert user to set roof direction
+			if (!userNotified) {
+				userNotified = true;
+				$("#info_modal").modal("show");
+			}
+
+		}
+
+		function handleMouseUpLine() {
+
+		    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+			lineDrawing = false;
+
+		    let points = [];
+		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY)));
+		    points.push(projection.fromContainerPixelToLatLng(new google.maps.Point(startX+width, startY+height)));
+
+			// add polyline to map
+		    var polyline = new google.maps.Polyline({
+				path: points,
+				strokeColor: 'black',
+				strokeWeight: 3,
+				icons: [{
+	                icon: {path: google.maps.SymbolPath.FORWARD_OPEN_ARROW},
+	                offset: '100%'
+	            }]
+			});
+
+			polylines[iterator_id-1] = polyline;
+			polyline.setMap(map);
+
+			// get polyline heading for input
+			let heading = google.maps.geometry.spherical.computeHeading(projection.fromContainerPixelToLatLng(new google.maps.Point(startX, startY)), projection.fromContainerPixelToLatLng(new google.maps.Point(startX+width, startY+height)));
+			heading = heading < 0 ? 360 + heading : heading;
+			$("#heading_"+(iterator_id-1)).val(heading.toFixed(1));
+			$("#heading_val_"+(iterator_id-1)).val(heading.toFixed(1));
+
+			// TODO enable rotating polyline
+
+		}
+
+		// 
+		function rotatePolyline(polyline, angle) {
+		    var map = polyline.getMap();
+		    var prj = map.getProjection();
+		    // TODO rotate around center, not origin
+		    var origin = prj.fromLatLngToPoint(polyline.getPath().getAt(0));
+
+		    var coords = polyline.getPath().getArray().map(function(latLng){
+		       var point = prj.fromLatLngToPoint(latLng);
+		       var rotatedLatLng =  prj.fromPointToLatLng(rotatePoint(point,origin,angle));
+		       return {lat: rotatedLatLng.lat(), lng: rotatedLatLng.lng()};
+		    });
+		    polyline.setPath(coords);
+		}
+
+		function rotatePoint(point, origin, angle) {
+		    var angleRad = angle * Math.PI / 180.0;
+		    return {
+		        x: Math.cos(angleRad) * (point.x - origin.x) - Math.sin(angleRad) * (point.y - origin.y) + origin.x,
+		        y: Math.sin(angleRad) * (point.x - origin.x) + Math.cos(angleRad) * (point.y - origin.y) + origin.y
+		    };
 		}
 
 		// end shape drawing
 		function handleMouseOut(e) {
+		    if (!isDown) { return; }
 		    e.preventDefault();
 		    e.stopPropagation();
 		    isDown = false;
 		    if (projection != undefined) {
-		    	handleMouseUp(e);
+		    	if (lineDrawing) {
+		    		handleMouseUpLine();
+		    	} else {
+		    		handleMouseUp(e);
+		    	}
 		    }
 		}
 
@@ -516,9 +690,20 @@
 		    width = mouseX - startX;
 		    height = mouseY - startY + scrollY;
 
-		    // draw a new rect from the start position 
-		    ctx.strokeRect(startX, startY, width, height);
+		    if (lineDrawing) {
+		    	handleMouseMoveLine();
+		    } else {
+			    // draw a new rect from the start position 
+			    ctx.strokeRect(startX, startY, width, height);
+		    }
 
+		}
+
+		function handleMouseMoveLine() {
+		    ctx.beginPath();
+			ctx.moveTo(startX, startY);
+			ctx.lineTo(startX+width, startY+height);
+			ctx.stroke();
 		}
 
 		// calculate total area from all polygon overlays
@@ -534,9 +719,9 @@
 			$("#finish_btn").attr("disabled", false);
 		}
 
-		// remove last added polygon
+		// remove last added polygon or polyline
 		function undo() {
-			if (iterator_id > 0) {
+			if (iterator_id > 1) {
 				for (var i = overlays.length - 1; i >=0; i--) {
 					if (overlays[i] != null) {
 						clearMap(i);
@@ -548,51 +733,67 @@
 
 		// clear shapes from map
 		function clearMap(polygon_id) {
+			lineDrawing = false;
 			// clear all shapes
 			if (polygon_id == undefined) {
 				for (var i in overlays) {
 					if (overlays[i] != null) {
 						overlays[i].setMap(null);
+						polylines[i].setMap(null);
 						$("#row_"+i).remove();
 						$("#"+i).remove();
 					}
 				}
 				overlays = [];
-				$("#canvas_"+iterator_id).remove();
-				iterator_id = 0;
+				polylines = [];
+				// $("#canvas").remove();
+				iterator_id = 1;
 				$("#total_area").val(0);
-				cloneCanvas();
+				// cloneCanvas();
+				for (var i in markers) {
+					markers[i].setMap(null);
+				}
+				markers = [];
 			} else {
-				// clear a single shape
-				overlays[polygon_id].setMap(null);
-				overlays[polygon_id] = null;
-				$("#row_"+polygon_id).remove();
-				$("#"+polygon_id).remove();
-				setTotalArea();
+				// clear a single shape (polyline or polygon)
+				if (polylines[polygon_id] != undefined) {
+					polylines[polygon_id].setMap(null);
+					polylines[polygon_id] = null;
+					// switch back to polyline drawing
+					lineDrawing = true;
+				} else {
+					overlays[polygon_id].setMap(null);
+					overlays[polygon_id] = null;
+					$("#row_"+polygon_id).remove();
+					$("#"+polygon_id).remove();
+					setTotalArea();
+					markers[polygon_id-1].setMap(null);
+				}
 			}
 			if ($("#total_area").val() == 0) {
 				$("#finish_btn").attr("disabled", true);
 			}
 		}
 
-		// create a new shape drawing canvas
+		// create a new canvas for drawing the next shape
 		function cloneCanvas() {
 			// delete the old canvas from the DOM
-			if (iterator_id > 0) {
-				$("#canvas_"+(parseInt(iterator_id)-1)).remove();
-				let oldCanvas = canvases.pop();
-				oldCanvas.remove();
-			}
-        	let new_canvas = $("#shape_canvas").clone();
-        	$(new_canvas).attr("id", "canvas_"+iterator_id);
-        	$(new_canvas).attr("width", $("#map").width());
-        	$("#map_overlay").after(new_canvas);
-        	canvases.push(new_canvas);
-        	$(new_canvas).show();
-        	enableShapeDrawing(iterator_id);
+			// if (iterator_id > 1) {
+			// 	$("#canvas_"+(parseInt(iterator_id)-1)).remove();
+			// 	let oldCanvas = canvases.pop();
+			// 	oldCanvas.remove();
+			// }
+        	// let new_canvas = $("#shape_canvas").clone();
+        	let $canvas = $("#canvas");
+        	// $(new_canvas).attr("id", "canvas_"+iterator_id);
+        	$($canvas).attr("width", $("#map").width());
+        	$("#map_overlay").after($canvas);
+        	// canvases.push(new_canvas);
+        	$($canvas).show();
+        	enableShapeDrawing();
 		}
 
-		// move to configurator
+		// submit values and move to configurator page
 		function finishConfig() {
 			let conf = confirm("Continue with the current array layout?");
 			if (conf) {
@@ -645,6 +846,19 @@
             	map.setZoom(20);
             	setMaxZoom(departure_autocomplete);
 
+            	// set latitude, longitude
+            	$("#latitude").val(departure_autocomplete.getPlace().geometry.location.lat());
+            	$("#longitude").val(departure_autocomplete.getPlace().geometry.location.lng());
+
+            	// get elevation
+            	let elevator = new google.maps.ElevationService();
+            	elevator.getElevationForLocations({
+					locations: [departure_autocomplete.getPlace().geometry.location],
+				})
+				.then(({ results }) => {
+            		$("#altitude").val(Math.round(results[0]['elevation']));
+				});
+
             	//** TO MAKE A BUILDING INSIGHTS API CALL **//
             	// generate API call URL
             	// let lat = departure_autocomplete.getPlace().geometry.location.lat();
@@ -691,6 +905,7 @@
 			maxZoomService.getMaxZoomAtLatLng(latLng, (result) => {
 				// if map zoom is less than max allowable, trigger place_changed event again
 				if (result.status == "OK") {
+					// zoom was not being set to max on load so we added a delayed call to place_changed to trigger an additional zoom event
 					let maxZoom = result.zoom < 20 ? result.zoom : 20;
 					if (map.getZoom() < maxZoom) {
 	            		setTimeout(() => {
@@ -703,7 +918,7 @@
 
 	</script>
 
-    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBffEwkEC7pbKMa57WpjvdykDW9GZKGezQ&callback=initMap&v=beta&libraries=places,drawing,geometry" async defer></script>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBffEwkEC7pbKMa57WpjvdykDW9GZKGezQ&callback=initMap&v=beta&libraries=places,drawing,geometry,elevation" async defer></script>
 
 </body>
 </html>

@@ -1,12 +1,7 @@
 <?php 
 
-	// get the selection values from the configurator; panel, inverter, etc
-	$data = array("module" => "some module");
-	// build url for python api
-	$url = "https://mforcella.pythonanywhere.com/";
-	$url = sprintf("%s?%s", $url, http_build_query($data));
-	// get response from api
-	$response = file_get_contents($url);
+	// get response from api call
+	$response = file_get_contents($_POST["submit_url"]);
 
 ?>
 
@@ -154,18 +149,113 @@
 
 	<div class="content">
 
-		<?php 
+		<!-- TODO add back button to edit configuration -->
 
-			echo $response;
+		<h2 class="center">Your Solar Report</h2>
 
-		?>
+		<div class="row">
+
+			<div class="col-md-6">
+				<h3>System Location</h3>
+				<div class="row">
+					<p><strong>Geolocation:</strong> <span id="geolocation"></span></p>
+				</div>
+				<div class="row">
+					<p><strong>Altitude:</strong> <span id="altitude"></span></p>
+				</div>
+			</div>
+
+			<div class="col-md-6">
+				<h3>System Hardware</h3>
+				<div class="row">
+					<p><strong>Inverter:</strong> <span id="inverter"></span></p>
+				</div>
+				<div class="row">
+					<p><strong>Solar Module:</strong> <span id="panel"></span></p>
+				</div>
+			</div>
+
+		</div>
+
+
+		<h3>Roof Segments</h3>
+		<div id="segments" class="row"></div>
+
+		<div id="graph"></div>
 
 	</div>
 
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script src="bootstrap/js/bootstrap.min.js"></script>
+	<script src="https://cdn.plot.ly/plotly-2.29.1.js" charset="utf-8"></script>
 
 	<script type="text/javascript">
+
+		let response = <?php echo json_encode($response); ?>;
+		var data = $.parseJSON('[' + response + ']');
+		console.log(data);
+
+		$("#geolocation").html(data[0]['location']['latitude']+", "+data[0]['location']['longitude']);
+		$("#altitude").html(data[0]['location']['altitude']+"m");
+		$("#inverter").html(data[0]['inverter']);
+		$("#panel").html(data[0]['module']);
+
+		for (var i=0; i < data[0]['roof_segment_count']; i++) {
+
+			let col = $('<div />', {
+				'class': "col-md-6"
+			}).appendTo($("#segments"));
+
+			$('<h4 />', {
+				'text': "Segment "+(i+1)
+			}).appendTo($(col));
+
+			let row0 = $('<div />', {
+				'class': "row"
+			}).appendTo($(col));
+			$('<p />', {
+				'html': "<strong>Roof dimensions (m):</strong> " + data[0]['roof_segments'][i]['roof_segment_length'] + " x " + data[0]['roof_segments'][i]['roof_segment_width']
+			}).appendTo($(row0));
+
+			let row1 = $('<div />', {
+				'class': "row"
+			}).appendTo($(col));
+			$('<p />', {
+				'html': "<strong>Number of modules:</strong> " + data[0]['roof_segments'][i]['total_modules']
+			}).appendTo($(row1));
+
+			let row2 = $('<div />', {
+				'class': "row"
+			}).appendTo($(col));
+			$('<p />', {
+				'html': "<strong>Roof direction:</strong> " + data[0]['roof_segments'][i]['roof_segment_direction']
+			}).appendTo($(row2));
+
+			let row3 = $('<div />', {
+				'class': "row"
+			}).appendTo($(col));
+			$('<p />', {
+				'html': "<strong>Roof pitch:</strong> " + data[0]['roof_segments'][i]['roof_segment_pitch']
+			}).appendTo($(row3));
+
+			// TODO get roof dimensions as well
+
+			// TODO get energy output for each segment
+
+			// set chart data
+			var energy_data = [
+				{
+					x: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+					y: data[0]['energies'],
+					type: 'bar'
+				}
+			];
+			var layout = {
+				title: 'Average Monthly Energy Output (kwh) of PV System'
+			};
+
+			Plotly.newPlot('graph', energy_data, layout);
+		}
 
 	</script>
 
